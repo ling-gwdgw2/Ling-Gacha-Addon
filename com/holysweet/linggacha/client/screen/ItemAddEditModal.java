@@ -9,6 +9,7 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.nbt.TagParser;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
@@ -45,9 +46,18 @@ public class ItemAddEditModal {
         this.itemIndex = -1;
         this.initialItemId = BuiltInRegistries.ITEM.getKey(heldStack.getItem()).toString();
         this.previewStack = heldStack.copy();
-        this.initialSnbt = null;
-        this.selectedRarity = GachaRarity.FOUR_STAR;
-        this.isRateUp = false;
+
+        String snbt = null;
+        try {
+            if (Minecraft.getInstance().level != null) {
+                var tag = heldStack.saveOptional(Minecraft.getInstance().level.registryAccess());
+                snbt = tag.getAsString();
+            }
+        } catch (Exception ignored) {}
+
+        this.initialSnbt = snbt;
+        this.selectedRarity = GachaRarity.FIVE_STAR;
+        this.isRateUp = true;
     }
 
     // Constructor for editing existing item
@@ -56,18 +66,32 @@ public class ItemAddEditModal {
         this.bannerId = bannerId;
         this.itemIndex = data.index();
         this.initialItemId = data.itemId();
-        this.previewStack = getStack(data.itemId(), data.count());
+        this.previewStack = getStack(data.itemId(), data.count(), data.snbt());
         this.initialSnbt = data.snbt();
         this.selectedRarity = GachaRarity.fromStars(data.stars());
         this.isRateUp = data.isRateUp();
     }
 
-    private ItemStack getStack(String id, int count) {
-        try {
-            var opt = BuiltInRegistries.ITEM.getOptional(ResourceLocation.parse(id));
-            if (opt.isPresent()) return new ItemStack(opt.get(), count);
-        } catch (Exception ignored) {}
-        return new ItemStack(Items.IRON_INGOT, 1);
+    private ItemStack getStack(String id, int count, String snbt) {
+        ItemStack stack = ItemStack.EMPTY;
+        if (snbt != null && !snbt.isEmpty()) {
+            try {
+                var tag = TagParser.parseTag(snbt);
+                if (Minecraft.getInstance().level != null) {
+                    stack = ItemStack.parseOptional(Minecraft.getInstance().level.registryAccess(), tag);
+                }
+            } catch (Exception ignored) {}
+        }
+        if (stack.isEmpty()) {
+            try {
+                var opt = BuiltInRegistries.ITEM.getOptional(ResourceLocation.parse(id));
+                if (opt.isPresent()) stack = new ItemStack(opt.get(), Math.max(1, count));
+            } catch (Exception ignored) {}
+        }
+        if (stack.isEmpty()) {
+            stack = new ItemStack(Items.IRON_INGOT, 1);
+        }
+        return stack;
     }
 
     public void init(int leftPos, int topPos) {
@@ -82,7 +106,7 @@ public class ItemAddEditModal {
 
         this.nameBox = new EditBox(Minecraft.getInstance().font, inputX, y, inputW, 14, Component.literal("Custom Name"));
         String defaultName = previewStack.has(net.minecraft.core.component.DataComponents.CUSTOM_NAME)
-                ? previewStack.getHoverName().getString() : "";
+                ? previewStack.getHoverName().getString() : previewStack.getHoverName().getString();
         this.nameBox.setValue(defaultName);
         y += 20;
 
@@ -211,22 +235,16 @@ public class ItemAddEditModal {
         if (nameBox != null && nameBox.mouseClicked(mouseX, mouseY, button)) return true;
         if (countBox != null && countBox.mouseClicked(mouseX, mouseY, button)) return true;
         if (weightBox != null && weightBox.mouseClicked(mouseX, mouseY, button)) return true;
-
         if (rarity3Btn != null && rarity3Btn.mouseClicked(mouseX, mouseY, button)) return true;
         if (rarity4Btn != null && rarity4Btn.mouseClicked(mouseX, mouseY, button)) return true;
         if (rarity5Btn != null && rarity5Btn.mouseClicked(mouseX, mouseY, button)) return true;
         if (rateUpBtn != null && rateUpBtn.mouseClicked(mouseX, mouseY, button)) return true;
         if (saveBtn != null && saveBtn.mouseClicked(mouseX, mouseY, button)) return true;
         if (cancelBtn != null && cancelBtn.mouseClicked(mouseX, mouseY, button)) return true;
-
-        return true;
+        return false;
     }
 
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
-        if (keyCode == 256) { // ESC
-            parent.closeModal();
-            return true;
-        }
         if (nameBox != null && nameBox.keyPressed(keyCode, scanCode, modifiers)) return true;
         if (countBox != null && countBox.keyPressed(keyCode, scanCode, modifiers)) return true;
         if (weightBox != null && weightBox.keyPressed(keyCode, scanCode, modifiers)) return true;

@@ -17,9 +17,31 @@ public record SyncBannerDataPayload(List<ClientBannerInfo> banners, int charPity
             SyncBannerDataPayload::new
     );
 
-    public record ClientBannerInfo(String id, String title, String subtitle, String type, int cost, int discount, String previewItem, int totalItems) {
+    public record ClientBannerInfo(
+            String id,
+            String title,
+            String subtitle,
+            String type,
+            int cost,
+            int discount,
+            String previewItem,
+            String featuredItemName,
+            String featuredSnbt,
+            int totalItems
+    ) {
         public static ClientBannerInfo read(FriendlyByteBuf buf) {
-            return new ClientBannerInfo(buf.readUtf(), buf.readUtf(), buf.readUtf(), buf.readUtf(), buf.readVarInt(), buf.readVarInt(), buf.readUtf(), buf.readVarInt());
+            return new ClientBannerInfo(
+                    buf.readUtf(),
+                    buf.readUtf(),
+                    buf.readUtf(),
+                    buf.readUtf(),
+                    buf.readVarInt(),
+                    buf.readVarInt(),
+                    buf.readUtf(),
+                    buf.readBoolean() ? buf.readUtf() : null,
+                    buf.readBoolean() ? buf.readUtf() : null,
+                    buf.readVarInt()
+            );
         }
 
         public void write(FriendlyByteBuf buf) {
@@ -30,6 +52,10 @@ public record SyncBannerDataPayload(List<ClientBannerInfo> banners, int charPity
             buf.writeVarInt(cost);
             buf.writeVarInt(discount);
             buf.writeUtf(previewItem);
+            buf.writeBoolean(featuredItemName != null);
+            if (featuredItemName != null) buf.writeUtf(featuredItemName);
+            buf.writeBoolean(featuredSnbt != null);
+            if (featuredSnbt != null) buf.writeUtf(featuredSnbt);
             buf.writeVarInt(totalItems);
         }
     }

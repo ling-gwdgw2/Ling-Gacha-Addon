@@ -152,4 +152,15 @@ public class GachaBanner {
                 .filter(i -> i.getRarity() == rarity && !i.isRateUp())
                 .collect(Collectors.toList());
     }
+
+    public GachaItemEntry getFeaturedRateUpItem() {
+        List<GachaItemEntry> rateUps = getRateUpItems(GachaRarity.FIVE_STAR);
+        if (!rateUps.isEmpty()) return rateUps.get(0);
+        List<GachaItemEntry> fives = getItemsByRarity(GachaRarity.FIVE_STAR);
+        if (!fives.isEmpty()) return fives.get(0);
+        List<GachaItemEntry> anyRateUps = items.stream().filter(GachaItemEntry::isRateUp).toList();
+        if (!anyRateUps.isEmpty()) return anyRateUps.get(0);
+        if (!items.isEmpty()) return items.get(0);
+        return null;
+    }
 }

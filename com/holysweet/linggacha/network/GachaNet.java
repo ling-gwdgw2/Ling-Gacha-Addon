@@ -179,6 +179,11 @@ public class GachaNet {
 
         List<SyncBannerDataPayload.ClientBannerInfo> clientBanners = new ArrayList<>();
         for (GachaBanner b : banners) {
+            GachaItemEntry featured = b.getFeaturedRateUpItem();
+            String previewItem = (featured != null) ? featured.getItemId() : b.getFeaturedPreviewItem();
+            String featuredName = (featured != null && featured.getCustomName() != null) ? featured.getCustomName() : null;
+            String featuredSnbt = (featured != null) ? featured.getSnbt() : null;
+
             clientBanners.add(new SyncBannerDataPayload.ClientBannerInfo(
                     b.getId(),
                     b.getTitle(),
@@ -186,7 +191,9 @@ public class GachaNet {
                     b.getBannerType().name(),
                     b.getCostPerPull(),
                     b.getTenPullDiscountPercent(),
-                    b.getFeaturedPreviewItem(),
+                    previewItem,
+                    featuredName,
+                    featuredSnbt,
                     b.getItems().size()
             ));
         }
