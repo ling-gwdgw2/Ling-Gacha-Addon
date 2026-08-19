@@ -20,7 +20,18 @@ public class GachaNet {
     public static void register(RegisterPayloadHandlersEvent event) {
         PayloadRegistrar registrar = event.registrar("ling_gacha").versioned("1.0.0");
 
-        // 1. Pull Convene Request (Client -> Server)
+        // 1. Request Open Gacha (Client -> Server)
+        registrar.playToServer(
+                RequestOpenGachaPayload.TYPE,
+                RequestOpenGachaPayload.STREAM_CODEC,
+                (payload, context) -> context.enqueueWork(() -> {
+                    if (context.player() instanceof ServerPlayer player) {
+                        openGachaForPlayer(player);
+                    }
+                })
+        );
+
+        // 2. Pull Convene Request (Client -> Server)
         registrar.playToServer(
                 PullConvenePayload.TYPE,
                 PullConvenePayload.STREAM_CODEC,
@@ -44,7 +55,7 @@ public class GachaNet {
                 })
         );
 
-        // 2. Convene Result Response (Server -> Client)
+        // 3. Convene Result Response (Server -> Client)
         registrar.playToClient(
                 ConveneResultPayload.TYPE,
                 ConveneResultPayload.STREAM_CODEC,
@@ -55,7 +66,7 @@ public class GachaNet {
                 })
         );
 
-        // 3. Sync Banner Data (Server -> Client)
+        // 4. Sync Banner Data (Server -> Client)
         registrar.playToClient(
                 SyncBannerDataPayload.TYPE,
                 SyncBannerDataPayload.STREAM_CODEC,

@@ -258,8 +258,8 @@ public class GachaScreen extends Screen {
             }
         } else if (current.type().equals("FEATURED_WEAPON")) {
             guiGraphics.drawString(this.font, "★ WEAPON BANNER: 100% GUARANTEED RATE-UP!", pityBoxX + 8, pityBoxY + 48, 0xFFFFD700, true);
-        } else if (current.type().equals("NOVICE")) {
-            guiGraphics.drawString(this.font, "★ NOVICE: 20% Discount / Guaranteed 5★ in 50", pityBoxX + 8, pityBoxY + 48, 0xFF55FFFF, true);
+        } else {
+            guiGraphics.drawString(this.font, "★ STANDARD POOL: Standard 5★ Resonators & Weapons", pityBoxX + 8, pityBoxY + 48, 0xFF55FFFF, true);
         }
 
         super.render(guiGraphics, mouseX, mouseY, partialTick);

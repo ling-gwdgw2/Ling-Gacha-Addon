@@ -90,7 +90,7 @@ public class GachaManager {
         int current5StarPity = data.getPity5Star(banner.getBannerType());
         int current4StarPity = data.getPity4Star(banner.getBannerType());
 
-        // 1. Calculate 5-Star Probability with Soft & Hard Pity
+        // 1. Calculate 5-Star Probability with Soft & Hard Pity (Hard Pity at 80)
         double fiveStarChance = 0.008; // 0.8% base
         if (current5StarPity >= 80) {
             fiveStarChance = 1.0; // Hard Pity 80
@@ -98,7 +98,7 @@ public class GachaManager {
             fiveStarChance = 0.008 + (current5StarPity - 64) * 0.06; // Soft Pity ramp up
         }
 
-        // 2. Calculate 4-Star Probability
+        // 2. Calculate 4-Star Probability (Hard Pity at 10)
         double fourStarChance = 0.06; // 6.0% base
         if (current4StarPity >= 10) {
             fourStarChance = 1.0; // Hard Pity 10
@@ -222,7 +222,7 @@ public class GachaManager {
         banners.clear();
 
         // 1. Featured Resonator Banner (Changli / Mythic Blade)
-        GachaBanner charBanner = new GachaBanner("featured_character", "Vermillion Flight", "Featured 5★ Resonator & Gear", GachaBanner.BannerType.FEATURED_RESONATOR, 160, 0, "minecraft:netherite_sword");
+        GachaBanner charBanner = new GachaBanner("featured_character", "Vermillion Flight", "Featured 5★ Resonator & Gear (50/50)", GachaBanner.BannerType.FEATURED_RESONATOR, 160, 0, "minecraft:netherite_sword");
         charBanner.addItem(new GachaItemEntry("minecraft:netherite_sword", 1, GachaRarity.FIVE_STAR, "Blazing Sunblade (5★ Rate-Up)", 10, true));
         charBanner.addItem(new GachaItemEntry("minecraft:elytra", 1, GachaRarity.FIVE_STAR, "Wings of Vermillion (5★ Standard)", 5, false));
         charBanner.addItem(new GachaItemEntry("minecraft:totem_of_undying", 2, GachaRarity.FIVE_STAR, "Resonator Rebirth Totem (5★ Standard)", 5, false));
@@ -245,16 +245,7 @@ public class GachaManager {
         weapBanner.addItem(new GachaItemEntry("minecraft:lapis_block", 8, GachaRarity.THREE_STAR, "Resonance Core", 50, false));
         banners.add(weapBanner);
 
-        // 3. Novice Convene (20% Discount - 8 pulls cost for 10 items)
-        GachaBanner noviceBanner = new GachaBanner("novice_convene", "Utterance of Marvels", "Novice Convene (20% Discount / 10-Pull for 1280 G)", GachaBanner.BannerType.NOVICE, 160, 20, "minecraft:beacon");
-        noviceBanner.addItem(new GachaItemEntry("minecraft:beacon", 1, GachaRarity.FIVE_STAR, "Resonance Beacon (5★ Guaranteed in 50)", 10, false));
-        noviceBanner.addItem(new GachaItemEntry("minecraft:netherite_ingot", 2, GachaRarity.FIVE_STAR, "Ancient Netherite Core (5★)", 10, false));
-        noviceBanner.addItem(new GachaItemEntry("minecraft:diamond_pickaxe", 1, GachaRarity.FOUR_STAR, "Novice Mining Pick (4★)", 30, false));
-        noviceBanner.addItem(new GachaItemEntry("minecraft:golden_apple", 8, GachaRarity.THREE_STAR, "Golden Ration", 60, false));
-        noviceBanner.addItem(new GachaItemEntry("minecraft:iron_ingot", 32, GachaRarity.THREE_STAR, "Standard Alloy", 60, false));
-        banners.add(noviceBanner);
-
-        // 4. Standard Convene
+        // 3. Standard Convene (Permanent Pool)
         GachaBanner stdBanner = new GachaBanner("standard_convene", "Tidal Cadence", "Standard Permanent Convene", GachaBanner.BannerType.STANDARD, 160, 0, "minecraft:nether_star");
         stdBanner.addItem(new GachaItemEntry("minecraft:nether_star", 1, GachaRarity.FIVE_STAR, "Celestial Star Core (5★)", 10, false));
         stdBanner.addItem(new GachaItemEntry("minecraft:dragon_egg", 1, GachaRarity.FIVE_STAR, "Dragon Heart (5★)", 5, false));

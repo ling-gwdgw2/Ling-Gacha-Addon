@@ -22,7 +22,6 @@ public class PlayerGachaData {
     private int standardPity5Star = 0;
     private int standardPity4Star = 0;
 
-    private int novicePulls = 0;
     private int totalPulls = 0;
     private int afterglowCorals = 0;
 
@@ -38,7 +37,6 @@ public class PlayerGachaData {
         return switch (type) {
             case FEATURED_RESONATOR -> characterPity5Star;
             case FEATURED_WEAPON -> weaponPity5Star;
-            case NOVICE -> novicePulls % 50;
             case STANDARD -> standardPity5Star;
         };
     }
@@ -47,7 +45,7 @@ public class PlayerGachaData {
         return switch (type) {
             case FEATURED_RESONATOR -> characterPity4Star;
             case FEATURED_WEAPON -> weaponPity4Star;
-            case NOVICE, STANDARD -> standardPity4Star;
+            case STANDARD -> standardPity4Star;
         };
     }
 
@@ -70,10 +68,6 @@ public class PlayerGachaData {
                 weaponPity5Star++;
                 weaponPity4Star++;
             }
-            case NOVICE -> {
-                novicePulls++;
-                standardPity4Star++;
-            }
             case STANDARD -> {
                 standardPity5Star++;
                 standardPity4Star++;
@@ -85,7 +79,6 @@ public class PlayerGachaData {
         switch (type) {
             case FEATURED_RESONATOR -> characterPity5Star = 0;
             case FEATURED_WEAPON -> weaponPity5Star = 0;
-            case NOVICE -> {}
             case STANDARD -> standardPity5Star = 0;
         }
     }
@@ -94,12 +87,8 @@ public class PlayerGachaData {
         switch (type) {
             case FEATURED_RESONATOR -> characterPity4Star = 0;
             case FEATURED_WEAPON -> weaponPity4Star = 0;
-            case NOVICE, STANDARD -> standardPity4Star = 0;
+            case STANDARD -> standardPity4Star = 0;
         }
-    }
-
-    public int getNovicePulls() {
-        return novicePulls;
     }
 
     public int getTotalPulls() {
@@ -129,7 +118,6 @@ public class PlayerGachaData {
                     if (obj.has("weap4")) data.weaponPity4Star = obj.get("weap4").getAsInt();
                     if (obj.has("std5")) data.standardPity5Star = obj.get("std5").getAsInt();
                     if (obj.has("std4")) data.standardPity4Star = obj.get("std4").getAsInt();
-                    if (obj.has("novice")) data.novicePulls = obj.get("novice").getAsInt();
                     if (obj.has("total")) data.totalPulls = obj.get("total").getAsInt();
                     if (obj.has("corals")) data.afterglowCorals = obj.get("corals").getAsInt();
                 }
@@ -152,7 +140,6 @@ public class PlayerGachaData {
             obj.addProperty("weap4", weaponPity4Star);
             obj.addProperty("std5", standardPity5Star);
             obj.addProperty("std4", standardPity4Star);
-            obj.addProperty("novice", novicePulls);
             obj.addProperty("total", totalPulls);
             obj.addProperty("corals", afterglowCorals);
 

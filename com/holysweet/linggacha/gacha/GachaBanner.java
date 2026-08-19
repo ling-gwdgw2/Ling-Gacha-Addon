@@ -10,7 +10,6 @@ public class GachaBanner {
     public enum BannerType {
         FEATURED_RESONATOR("Featured Character", true, false),
         FEATURED_WEAPON("Featured Weapon", false, true),
-        NOVICE("Novice Convene", false, false),
         STANDARD("Standard Convene", false, false);
 
         private final String displayName;
