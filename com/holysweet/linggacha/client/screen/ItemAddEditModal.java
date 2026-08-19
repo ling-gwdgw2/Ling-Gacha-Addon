@@ -241,10 +241,14 @@ public class ItemAddEditModal {
         if (rateUpBtn != null && rateUpBtn.mouseClicked(mouseX, mouseY, button)) return true;
         if (saveBtn != null && saveBtn.mouseClicked(mouseX, mouseY, button)) return true;
         if (cancelBtn != null && cancelBtn.mouseClicked(mouseX, mouseY, button)) return true;
-        return false;
+        return true;
     }
 
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        if (keyCode == 256) { // ESC key
+            parent.closeModal();
+            return true;
+        }
         if (nameBox != null && nameBox.keyPressed(keyCode, scanCode, modifiers)) return true;
         if (countBox != null && countBox.keyPressed(keyCode, scanCode, modifiers)) return true;
         if (weightBox != null && weightBox.keyPressed(keyCode, scanCode, modifiers)) return true;

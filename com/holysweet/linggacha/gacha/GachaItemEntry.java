@@ -65,19 +65,29 @@ public class GachaItemEntry {
     }
 
     public ItemStack createItemStack() {
+        return createItemStack(null);
+    }
+
+    public ItemStack createItemStack(HolderLookup.Provider registries) {
+        if (snbt != null && !snbt.trim().isEmpty()) {
+            try {
+                CompoundTag tag = TagParser.parseTag(snbt);
+                if (registries != null) {
+                    ItemStack parsed = ItemStack.parseOptional(registries, tag);
+                    if (!parsed.isEmpty()) {
+                        if (customName != null && !customName.trim().isEmpty()) {
+                            parsed.set(net.minecraft.core.component.DataComponents.CUSTOM_NAME, Component.literal(customName));
+                        }
+                        return parsed;
+                    }
+                }
+            } catch (Exception ignored) {}
+        }
         try {
             ResourceLocation rl = ResourceLocation.parse(itemId);
             Optional<Item> itemOpt = BuiltInRegistries.ITEM.getOptional(rl);
             if (itemOpt.isPresent()) {
                 ItemStack stack = new ItemStack(itemOpt.get(), count);
-
-                if (snbt != null && !snbt.trim().isEmpty()) {
-                    try {
-                        CompoundTag tag = TagParser.parseTag(snbt);
-                        // In 1.21.1, if tag has components/data
-                    } catch (Exception ignored) {}
-                }
-
                 if (customName != null && !customName.trim().isEmpty()) {
                     stack.set(net.minecraft.core.component.DataComponents.CUSTOM_NAME, Component.literal(customName));
                 }
@@ -87,13 +97,21 @@ public class GachaItemEntry {
         return new ItemStack(Items.DIRT, 1);
     }
 
-    public static GachaItemEntry fromItemStack(ItemStack stack, GachaRarity rarity, int weight, boolean isRateUp, String customNameOverride) {
+    public static GachaItemEntry fromItemStack(ItemStack stack, GachaRarity rarity, int weight, boolean isRateUp, String customNameOverride, HolderLookup.Provider registries) {
         String id = BuiltInRegistries.ITEM.getKey(stack.getItem()).toString();
         int count = stack.getCount();
         String name = (customNameOverride != null && !customNameOverride.trim().isEmpty())
                 ? customNameOverride
                 : (stack.has(net.minecraft.core.component.DataComponents.CUSTOM_NAME) ? stack.getHoverName().getString() : null);
 
-        return new GachaItemEntry(id, count, rarity, name, weight, isRateUp, null);
+        String snbt = null;
+        if (registries != null) {
+            try {
+                var tag = stack.saveOptional(registries);
+                snbt = tag.getAsString();
+            } catch (Exception ignored) {}
+        }
+
+        return new GachaItemEntry(id, count, rarity, name, weight, isRateUp, snbt);
     }
 }

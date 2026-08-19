@@ -132,7 +132,7 @@ public class GachaManager {
             results.add(prize);
 
             // Add item to inventory
-            ItemStack itemStack = prize.createItemStack();
+            ItemStack itemStack = prize.createItemStack(player.registryAccess());
             if (!player.getInventory().add(itemStack)) {
                 player.drop(itemStack, false);
             }
