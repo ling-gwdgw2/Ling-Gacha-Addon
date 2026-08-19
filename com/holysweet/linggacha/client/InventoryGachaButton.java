@@ -6,9 +6,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.Tooltip;
-import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
-import net.minecraft.client.gui.screens.inventory.CreativeModeInventoryScreen;
-import net.minecraft.client.gui.screens.inventory.InventoryScreen;
+import net.minecraft.client.gui.screens.PauseScreen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.api.distmarker.Dist;
@@ -22,11 +20,11 @@ import net.neoforged.neoforge.network.PacketDistributor;
 @EventBusSubscriber(modid = LingGachaMod.MODID, value = Dist.CLIENT)
 public class InventoryGachaButton {
 
-    public static class GachaButton extends Button {
+    public static class GachaMenuButton extends Button {
         private final ItemStack tokenStack;
 
-        public GachaButton(int x, int y, OnPress onPress, Tooltip tooltip) {
-            super(x, y, 18, 18, Component.empty(), onPress, DEFAULT_NARRATION);
+        public GachaMenuButton(int x, int y, OnPress onPress, Tooltip tooltip) {
+            super(x, y, 20, 20, Component.empty(), onPress, DEFAULT_NARRATION);
             setTooltip(tooltip);
             this.tokenStack = (LingGachaMod.CONVENE_TIDE != null && LingGachaMod.CONVENE_TIDE.get() != null)
                     ? new ItemStack(LingGachaMod.CONVENE_TIDE.get())
@@ -37,29 +35,32 @@ public class InventoryGachaButton {
         protected void renderWidget(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
             super.renderWidget(guiGraphics, mouseX, mouseY, partialTick);
 
-            // Draw glowing star icon or item stack
             if (!this.tokenStack.isEmpty()) {
-                guiGraphics.renderItem(this.tokenStack, this.getX() + 1, this.getY() + 1);
+                guiGraphics.renderItem(this.tokenStack, this.getX() + 2, this.getY() + 2);
             } else {
                 int starColor = this.isHoveredOrFocused() ? 0xFFFFD700 : 0xFFE0AAFF;
-                guiGraphics.drawString(Minecraft.getInstance().font, "✦", this.getX() + 5, this.getY() + 5, starColor, true);
+                guiGraphics.drawString(Minecraft.getInstance().font, "✦", this.getX() + 6, this.getY() + 6, starColor, true);
             }
         }
     }
 
     @SubscribeEvent
     public static void onScreenInit(ScreenEvent.Init.Post event) {
-        if (event.getScreen() instanceof InventoryScreen || event.getScreen() instanceof CreativeModeInventoryScreen) {
-            AbstractContainerScreen<?> screen = (AbstractContainerScreen<?>) event.getScreen();
-            int x = screen.getGuiLeft() + 128;
-            int y = screen.getGuiTop() + 6;
+        // Place Gacha button in the PauseScreen (Game Menu / ESC Menu)
+        if (event.getScreen() instanceof PauseScreen screen) {
+            int centerX = screen.width / 2;
+            int startY = screen.height / 4;
 
-            GachaButton gachaBtn = new GachaButton(
+            // Positioned symmetrically on the right side of the menu (Right of 'Report Bugs' button, above 's' button)
+            int x = centerX + 102 + 4;
+            int y = startY + 72;
+
+            GachaMenuButton gachaBtn = new GachaMenuButton(
                     x, y,
                     btn -> {
                         PacketDistributor.sendToServer(new RequestOpenGachaPayload());
                     },
-                    Tooltip.create(Component.literal("Open Convene / Gacha"))
+                    Tooltip.create(Component.literal("Convene / Gacha (唤取)"))
             );
 
             event.addListener(gachaBtn);
