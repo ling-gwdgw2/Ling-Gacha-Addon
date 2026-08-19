@@ -36,12 +36,12 @@ public class GachaBanner {
     }
 
     private final String id;
-    private final String title;
-    private final String subtitle;
-    private final BannerType bannerType;
-    private final int costPerPull;
-    private final int tenPullDiscountPercent;
-    private final String featuredPreviewItem;
+    private String title;
+    private String subtitle;
+    private BannerType bannerType;
+    private int costPerPull;
+    private int tenPullDiscountPercent;
+    private String featuredPreviewItem;
     private final List<GachaItemEntry> items = new ArrayList<>();
 
     public GachaBanner(String id, String title, String subtitle, BannerType bannerType, int costPerPull, int tenPullDiscountPercent, String featuredPreviewItem) {
@@ -62,16 +62,32 @@ public class GachaBanner {
         return title;
     }
 
+    public void setTitle(String title) {
+        this.title = title;
+    }
+
     public String getSubtitle() {
         return subtitle;
+    }
+
+    public void setSubtitle(String subtitle) {
+        this.subtitle = subtitle;
     }
 
     public BannerType getBannerType() {
         return bannerType;
     }
 
+    public void setBannerType(BannerType bannerType) {
+        this.bannerType = bannerType;
+    }
+
     public int getCostPerPull() {
         return costPerPull;
+    }
+
+    public void setCostPerPull(int costPerPull) {
+        this.costPerPull = Math.max(1, costPerPull);
     }
 
     public int getTenPullCost() {
@@ -87,12 +103,32 @@ public class GachaBanner {
         return tenPullDiscountPercent;
     }
 
+    public void setTenPullDiscountPercent(int tenPullDiscountPercent) {
+        this.tenPullDiscountPercent = Math.max(0, Math.min(100, tenPullDiscountPercent));
+    }
+
     public String getFeaturedPreviewItem() {
         return featuredPreviewItem;
     }
 
+    public void setFeaturedPreviewItem(String featuredPreviewItem) {
+        this.featuredPreviewItem = featuredPreviewItem;
+    }
+
     public void addItem(GachaItemEntry entry) {
         items.add(entry);
+    }
+
+    public void removeItem(int index) {
+        if (index >= 0 && index < items.size()) {
+            items.remove(index);
+        }
+    }
+
+    public void updateItem(int index, GachaItemEntry entry) {
+        if (index >= 0 && index < items.size()) {
+            items.set(index, entry);
+        }
     }
 
     public List<GachaItemEntry> getItems() {

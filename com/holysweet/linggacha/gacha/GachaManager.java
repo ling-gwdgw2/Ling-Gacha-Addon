@@ -4,9 +4,11 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
+import com.holysweet.linggacha.network.GachaNet;
 import com.holysweet.questshop.service.CoinsService;
 import com.mojang.logging.LogUtils;
 import net.minecraft.network.chat.Component;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
 import org.slf4j.Logger;
@@ -38,6 +40,70 @@ public class GachaManager {
 
     public PlayerGachaData getPlayerData(UUID uuid) {
         return playerDataCache.computeIfAbsent(uuid, PlayerGachaData::load);
+    }
+
+    public synchronized void addOrUpdateBanner(String id, String title, String subtitle, GachaBanner.BannerType type, int cost, int discount, String preview, MinecraftServer server) {
+        Optional<GachaBanner> existing = getBanner(id);
+        if (existing.isPresent()) {
+            GachaBanner b = existing.get();
+            b.setTitle(title);
+            b.setSubtitle(subtitle);
+            b.setBannerType(type);
+            b.setCostPerPull(cost);
+            b.setTenPullDiscountPercent(discount);
+            b.setFeaturedPreviewItem(preview);
+        } else {
+            GachaBanner newBanner = new GachaBanner(id, title, subtitle, type, cost, discount, preview);
+            banners.add(newBanner);
+        }
+        saveBanners();
+        if (server != null) {
+            syncAllOnlinePlayers(server);
+        }
+    }
+
+    public synchronized void deleteBanner(String id, MinecraftServer server) {
+        banners.removeIf(b -> b.getId().equalsIgnoreCase(id));
+        saveBanners();
+        if (server != null) {
+            syncAllOnlinePlayers(server);
+        }
+    }
+
+    public synchronized void addItemToBanner(String bannerId, GachaItemEntry entry, MinecraftServer server) {
+        getBanner(bannerId).ifPresent(b -> {
+            b.addItem(entry);
+            saveBanners();
+            if (server != null) {
+                syncAllOnlinePlayers(server);
+            }
+        });
+    }
+
+    public synchronized void updateItemInBanner(String bannerId, int index, GachaItemEntry entry, MinecraftServer server) {
+        getBanner(bannerId).ifPresent(b -> {
+            b.updateItem(index, entry);
+            saveBanners();
+            if (server != null) {
+                syncAllOnlinePlayers(server);
+            }
+        });
+    }
+
+    public synchronized void removeItemFromBanner(String bannerId, int index, MinecraftServer server) {
+        getBanner(bannerId).ifPresent(b -> {
+            b.removeItem(index);
+            saveBanners();
+            if (server != null) {
+                syncAllOnlinePlayers(server);
+            }
+        });
+    }
+
+    public void syncAllOnlinePlayers(MinecraftServer server) {
+        for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+            GachaNet.syncDataToPlayer(player);
+        }
     }
 
     public synchronized List<GachaItemEntry> performConvene(ServerPlayer player, String bannerId, int pullCount) {
@@ -205,8 +271,9 @@ public class GachaManager {
                         String name = itemObj.has("name") ? itemObj.get("name").getAsString() : null;
                         int weight = itemObj.has("weight") ? itemObj.get("weight").getAsInt() : 1;
                         boolean rateUp = itemObj.has("rateUp") && itemObj.get("rateUp").getAsBoolean();
+                        String snbt = itemObj.has("snbt") ? itemObj.get("snbt").getAsString() : null;
 
-                        banner.addItem(new GachaItemEntry(itemId, count, GachaRarity.fromStars(stars), name, weight, rateUp));
+                        banner.addItem(new GachaItemEntry(itemId, count, GachaRarity.fromStars(stars), name, weight, rateUp, snbt));
                     }
                 }
                 banners.add(banner);
@@ -284,6 +351,7 @@ public class GachaManager {
                     if (item.getCustomName() != null) itemObj.addProperty("name", item.getCustomName());
                     itemObj.addProperty("weight", item.getWeight());
                     itemObj.addProperty("rateUp", item.isRateUp());
+                    if (item.getSnbt() != null) itemObj.addProperty("snbt", item.getSnbt());
                     itemsArr.add(itemObj);
                 }
                 obj.add("items", itemsArr);

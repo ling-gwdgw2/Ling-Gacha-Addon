@@ -2,10 +2,7 @@ package com.holysweet.linggacha.network;
 
 import com.holysweet.linggacha.client.ClientGachaData;
 import com.holysweet.linggacha.client.ClientHooks;
-import com.holysweet.linggacha.gacha.GachaBanner;
-import com.holysweet.linggacha.gacha.GachaItemEntry;
-import com.holysweet.linggacha.gacha.GachaManager;
-import com.holysweet.linggacha.gacha.PlayerGachaData;
+import com.holysweet.linggacha.gacha.*;
 import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.fml.loading.FMLEnvironment;
 import net.neoforged.neoforge.network.PacketDistributor;
@@ -55,7 +52,89 @@ public class GachaNet {
                 })
         );
 
-        // 3. Convene Result Response (Server -> Client)
+        // 3. Admin Update/Add Banner (Client -> Server)
+        registrar.playToServer(
+                AdminUpdateBannerPayload.TYPE,
+                AdminUpdateBannerPayload.STREAM_CODEC,
+                (payload, context) -> context.enqueueWork(() -> {
+                    if (context.player() instanceof ServerPlayer player && (player.hasPermissions(2) || player.isCreative())) {
+                        GachaBanner.BannerType type = GachaBanner.BannerType.valueOf(payload.bannerType());
+                        GachaManager.INSTANCE.addOrUpdateBanner(
+                                payload.id(), payload.title(), payload.subtitle(), type,
+                                payload.cost(), payload.discount(), payload.preview(),
+                                player.getServer()
+                        );
+                    }
+                })
+        );
+
+        // 4. Admin Delete Banner (Client -> Server)
+        registrar.playToServer(
+                AdminDeleteBannerPayload.TYPE,
+                AdminDeleteBannerPayload.STREAM_CODEC,
+                (payload, context) -> context.enqueueWork(() -> {
+                    if (context.player() instanceof ServerPlayer player && (player.hasPermissions(2) || player.isCreative())) {
+                        GachaManager.INSTANCE.deleteBanner(payload.id(), player.getServer());
+                    }
+                })
+        );
+
+        // 5. Admin Add Item to Banner (Client -> Server)
+        registrar.playToServer(
+                AdminAddGachaItemPayload.TYPE,
+                AdminAddGachaItemPayload.STREAM_CODEC,
+                (payload, context) -> context.enqueueWork(() -> {
+                    if (context.player() instanceof ServerPlayer player && (player.hasPermissions(2) || player.isCreative())) {
+                        GachaRarity rarity = GachaRarity.fromStars(payload.stars());
+                        GachaItemEntry entry = new GachaItemEntry(
+                                payload.itemId(), payload.count(), rarity, payload.customName(), payload.weight(), payload.isRateUp(), payload.snbt()
+                        );
+                        GachaManager.INSTANCE.addItemToBanner(payload.bannerId(), entry, player.getServer());
+                        sendItemPoolToPlayer(player, payload.bannerId());
+                    }
+                })
+        );
+
+        // 6. Admin Update Item in Banner (Client -> Server)
+        registrar.playToServer(
+                AdminUpdateGachaItemPayload.TYPE,
+                AdminUpdateGachaItemPayload.STREAM_CODEC,
+                (payload, context) -> context.enqueueWork(() -> {
+                    if (context.player() instanceof ServerPlayer player && (player.hasPermissions(2) || player.isCreative())) {
+                        GachaRarity rarity = GachaRarity.fromStars(payload.stars());
+                        GachaItemEntry entry = new GachaItemEntry(
+                                payload.itemId(), payload.count(), rarity, payload.customName(), payload.weight(), payload.isRateUp(), payload.snbt()
+                        );
+                        GachaManager.INSTANCE.updateItemInBanner(payload.bannerId(), payload.itemIndex(), entry, player.getServer());
+                        sendItemPoolToPlayer(player, payload.bannerId());
+                    }
+                })
+        );
+
+        // 7. Admin Remove Item from Banner (Client -> Server)
+        registrar.playToServer(
+                AdminRemoveGachaItemPayload.TYPE,
+                AdminRemoveGachaItemPayload.STREAM_CODEC,
+                (payload, context) -> context.enqueueWork(() -> {
+                    if (context.player() instanceof ServerPlayer player && (player.hasPermissions(2) || player.isCreative())) {
+                        GachaManager.INSTANCE.removeItemFromBanner(payload.bannerId(), payload.itemIndex(), player.getServer());
+                        sendItemPoolToPlayer(player, payload.bannerId());
+                    }
+                })
+        );
+
+        // 8. Admin Request Item Pool (Client -> Server)
+        registrar.playToServer(
+                AdminRequestItemPoolPayload.TYPE,
+                AdminRequestItemPoolPayload.STREAM_CODEC,
+                (payload, context) -> context.enqueueWork(() -> {
+                    if (context.player() instanceof ServerPlayer player) {
+                        sendItemPoolToPlayer(player, payload.bannerId());
+                    }
+                })
+        );
+
+        // 9. Convene Result Response (Server -> Client)
         registrar.playToClient(
                 ConveneResultPayload.TYPE,
                 ConveneResultPayload.STREAM_CODEC,
@@ -66,20 +145,37 @@ public class GachaNet {
                 })
         );
 
-        // 4. Sync Banner Data (Server -> Client)
+        // 10. Sync Banner Data (Server -> Client)
         registrar.playToClient(
                 SyncBannerDataPayload.TYPE,
                 SyncBannerDataPayload.STREAM_CODEC,
                 (payload, context) -> context.enqueueWork(() -> {
                     if (FMLEnvironment.dist.isClient()) {
                         ClientGachaData.update(payload);
-                        ClientHooks.openGachaScreen();
+                    }
+                })
+        );
+
+        // 11. Admin Sync Item Pool (Server -> Client)
+        registrar.playToClient(
+                AdminSyncItemPoolPayload.TYPE,
+                AdminSyncItemPoolPayload.STREAM_CODEC,
+                (payload, context) -> context.enqueueWork(() -> {
+                    if (FMLEnvironment.dist.isClient()) {
+                        ClientHooks.handleSyncItemPool(payload);
                     }
                 })
         );
     }
 
     public static void openGachaForPlayer(ServerPlayer player) {
+        syncDataToPlayer(player);
+        if (FMLEnvironment.dist.isClient()) {
+            ClientHooks.openGachaScreen();
+        }
+    }
+
+    public static void syncDataToPlayer(ServerPlayer player) {
         PlayerGachaData data = GachaManager.INSTANCE.getPlayerData(player.getUUID());
         List<GachaBanner> banners = GachaManager.INSTANCE.getBanners();
 
@@ -104,5 +200,19 @@ public class GachaNet {
         boolean isGuaranteed = data.isCharacterGuaranteedFeatured();
 
         PacketDistributor.sendToPlayer(player, new SyncBannerDataPayload(clientBanners, charPity, weapPity, stdPity, corals, isGuaranteed));
+    }
+
+    public static void sendItemPoolToPlayer(ServerPlayer player, String bannerId) {
+        GachaManager.INSTANCE.getBanner(bannerId).ifPresent(b -> {
+            List<AdminSyncItemPoolPayload.ItemEntryData> list = new ArrayList<>();
+            List<GachaItemEntry> items = b.getItems();
+            for (int i = 0; i < items.size(); i++) {
+                GachaItemEntry item = items.get(i);
+                list.add(new AdminSyncItemPoolPayload.ItemEntryData(
+                        i, item.getItemId(), item.getCount(), item.getRarity().getStars(), item.getCustomName(), item.getWeight(), item.isRateUp(), item.getSnbt()
+                ));
+            }
+            PacketDistributor.sendToPlayer(player, new AdminSyncItemPoolPayload(bannerId, list));
+        });
     }
 }

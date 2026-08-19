@@ -1,6 +1,9 @@
 package com.holysweet.linggacha.gacha;
 
+import net.minecraft.core.HolderLookup;
 import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.TagParser;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.Item;
@@ -17,14 +20,20 @@ public class GachaItemEntry {
     private final String customName;
     private final int weight;
     private final boolean isRateUp;
+    private final String snbt;
 
     public GachaItemEntry(String itemId, int count, GachaRarity rarity, String customName, int weight, boolean isRateUp) {
+        this(itemId, count, rarity, customName, weight, isRateUp, null);
+    }
+
+    public GachaItemEntry(String itemId, int count, GachaRarity rarity, String customName, int weight, boolean isRateUp, String snbt) {
         this.itemId = itemId;
         this.count = Math.max(1, count);
         this.rarity = rarity;
         this.customName = customName;
         this.weight = Math.max(1, weight);
         this.isRateUp = isRateUp;
+        this.snbt = snbt;
     }
 
     public String getItemId() {
@@ -51,12 +60,24 @@ public class GachaItemEntry {
         return isRateUp;
     }
 
+    public String getSnbt() {
+        return snbt;
+    }
+
     public ItemStack createItemStack() {
         try {
             ResourceLocation rl = ResourceLocation.parse(itemId);
             Optional<Item> itemOpt = BuiltInRegistries.ITEM.getOptional(rl);
             if (itemOpt.isPresent()) {
                 ItemStack stack = new ItemStack(itemOpt.get(), count);
+
+                if (snbt != null && !snbt.trim().isEmpty()) {
+                    try {
+                        CompoundTag tag = TagParser.parseTag(snbt);
+                        // In 1.21.1, if tag has components/data
+                    } catch (Exception ignored) {}
+                }
+
                 if (customName != null && !customName.trim().isEmpty()) {
                     stack.set(net.minecraft.core.component.DataComponents.CUSTOM_NAME, Component.literal(customName));
                 }
@@ -64,5 +85,15 @@ public class GachaItemEntry {
             }
         } catch (Exception ignored) {}
         return new ItemStack(Items.DIRT, 1);
+    }
+
+    public static GachaItemEntry fromItemStack(ItemStack stack, GachaRarity rarity, int weight, boolean isRateUp, String customNameOverride) {
+        String id = BuiltInRegistries.ITEM.getKey(stack.getItem()).toString();
+        int count = stack.getCount();
+        String name = (customNameOverride != null && !customNameOverride.trim().isEmpty())
+                ? customNameOverride
+                : (stack.has(net.minecraft.core.component.DataComponents.CUSTOM_NAME) ? stack.getHoverName().getString() : null);
+
+        return new GachaItemEntry(id, count, rarity, name, weight, isRateUp, null);
     }
 }

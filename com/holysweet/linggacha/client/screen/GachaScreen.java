@@ -1,6 +1,7 @@
 package com.holysweet.linggacha.client.screen;
 
 import com.holysweet.linggacha.client.ClientGachaData;
+import com.holysweet.linggacha.network.AdminSyncItemPoolPayload;
 import com.holysweet.linggacha.network.PullConvenePayload;
 import com.holysweet.linggacha.network.SyncBannerDataPayload;
 import com.holysweet.questshop.client.ClientCoins;
@@ -26,10 +27,23 @@ public class GachaScreen extends Screen {
 
     private int selectedBannerIndex = 0;
 
+    // Normal User Controls
     private Button pull1Btn;
     private Button pull10Btn;
     private Button detailsBtn;
+
+    // Admin / OP Controls
+    private boolean editMode = false;
+    private Button editModeToggleBtn;
+    private Button bannerSettingsBtn;
+    private Button poolManagerBtn;
+    private Button newBannerBtn;
+
+    // Active Modals
     private GachaDetailsModal activeDetailsModal = null;
+    private BannerSettingsModal activeBannerSettingsModal = null;
+    private ItemPoolEditModal activeItemPoolModal = null;
+    private ItemAddEditModal activeItemAddEditModal = null;
 
     public GachaScreen() {
         super(Component.literal("Convene / Gacha"));
@@ -63,16 +77,105 @@ public class GachaScreen extends Screen {
                 .bounds(this.leftPos + this.imageWidth - 135, btnY, 125, 20).build();
         this.addRenderableWidget(pull10Btn);
 
+        // Admin Controls (OP or Creative Mode)
+        boolean canAdmin = false;
+        if (Minecraft.getInstance().player != null) {
+            canAdmin = Minecraft.getInstance().player.hasPermissions(2) || Minecraft.getInstance().player.isCreative();
+        }
+
+        if (canAdmin) {
+            this.editModeToggleBtn = Button.builder(Component.literal(editMode ? "§c[Exit Edit]" : "§e[⚙ Edit Mode]"), b -> toggleEditMode())
+                    .bounds(this.leftPos - 110, this.topPos + this.imageHeight - 24, 105, 18).build();
+            this.addRenderableWidget(editModeToggleBtn);
+
+            int adminBtnY = this.topPos + 32;
+            this.bannerSettingsBtn = Button.builder(Component.literal("§e⚙ Settings"), b -> openBannerSettingsModal(getCurrentBanner(), false))
+                    .bounds(this.leftPos + this.imageWidth - 195, adminBtnY, 80, 16).build();
+            this.bannerSettingsBtn.visible = editMode;
+            this.addRenderableWidget(bannerSettingsBtn);
+
+            this.poolManagerBtn = Button.builder(Component.literal("§b🗂 Pool (" + getCurrentBanner().totalItems() + ")"), b -> openItemPoolModal(getCurrentBanner().id(), getCurrentBanner().title()))
+                    .bounds(this.leftPos + this.imageWidth - 110, adminBtnY, 100, 16).build();
+            this.poolManagerBtn.visible = editMode;
+            this.addRenderableWidget(poolManagerBtn);
+
+            this.newBannerBtn = Button.builder(Component.literal("§a+ New Banner"), b -> createNewBanner())
+                    .bounds(this.leftPos - 110, this.topPos - 20, 105, 16).build();
+            this.newBannerBtn.visible = editMode;
+            this.addRenderableWidget(newBannerBtn);
+        }
+
         updateButtons();
     }
 
+    private void toggleEditMode() {
+        this.editMode = !editMode;
+        if (editModeToggleBtn != null) {
+            editModeToggleBtn.setMessage(Component.literal(editMode ? "§c[Exit Edit]" : "§e[⚙ Edit Mode]"));
+        }
+        if (bannerSettingsBtn != null) bannerSettingsBtn.visible = editMode;
+        if (poolManagerBtn != null) poolManagerBtn.visible = editMode;
+        if (newBannerBtn != null) newBannerBtn.visible = editMode;
+    }
+
+    public void refreshData() {
+        updateButtons();
+        if (poolManagerBtn != null) {
+            poolManagerBtn.setMessage(Component.literal("§b🗂 Pool (" + getCurrentBanner().totalItems() + ")"));
+        }
+    }
+
+    public void onItemPoolSynced(AdminSyncItemPoolPayload payload) {
+        if (activeItemPoolModal != null) {
+            activeItemPoolModal.updateItems(payload.items());
+        }
+    }
+
     private void openDetails() {
+        closeModal();
         this.activeDetailsModal = new GachaDetailsModal(this, getCurrentBanner());
         this.activeDetailsModal.init(leftPos, topPos);
     }
 
+    public void openBannerSettingsModal(SyncBannerDataPayload.ClientBannerInfo banner, boolean isNew) {
+        closeModal();
+        this.activeBannerSettingsModal = new BannerSettingsModal(this, banner, isNew);
+        this.activeBannerSettingsModal.init(leftPos, topPos);
+    }
+
+    public void openItemPoolModal(String bannerId, String bannerTitle) {
+        closeModal();
+        this.activeItemPoolModal = new ItemPoolEditModal(this, bannerId, bannerTitle);
+        this.activeItemPoolModal.init(leftPos, topPos);
+    }
+
+    public void openItemAddModal(String bannerId, ItemStack heldStack) {
+        this.activeItemAddEditModal = new ItemAddEditModal(this, bannerId, heldStack);
+        this.activeItemAddEditModal.init(leftPos, topPos);
+    }
+
+    public void openItemEditModal(String bannerId, AdminSyncItemPoolPayload.ItemEntryData itemData) {
+        this.activeItemAddEditModal = new ItemAddEditModal(this, bannerId, itemData);
+        this.activeItemAddEditModal.init(leftPos, topPos);
+    }
+
+    public void closeModal() {
+        this.activeDetailsModal = null;
+        this.activeBannerSettingsModal = null;
+        this.activeItemPoolModal = null;
+        this.activeItemAddEditModal = null;
+    }
+
     public void closeDetails() {
         this.activeDetailsModal = null;
+    }
+
+    private void createNewBanner() {
+        String newId = "custom_banner_" + (ClientGachaData.getBanners().size() + 1);
+        SyncBannerDataPayload.ClientBannerInfo dummy = new SyncBannerDataPayload.ClientBannerInfo(
+                newId, "New Banner", "Custom Pool", "FEATURED_RESONATOR", 160, 0, "minecraft:diamond_sword", 0
+        );
+        openBannerSettingsModal(dummy, true);
     }
 
     private SyncBannerDataPayload.ClientBannerInfo getCurrentBanner() {
@@ -101,10 +204,22 @@ public class GachaScreen extends Screen {
             String discountStr = banner.discount() > 0 ? " [" + banner.discount() + "% OFF]" : "";
             pull10Btn.setMessage(Component.literal("Convene 10x (" + cost10 + " G)" + discountStr));
         }
+        if (poolManagerBtn != null) {
+            poolManagerBtn.setMessage(Component.literal("§b🗂 Pool (" + banner.totalItems() + ")"));
+        }
     }
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        if (activeItemAddEditModal != null) {
+            return activeItemAddEditModal.mouseClicked(mouseX, mouseY, button);
+        }
+        if (activeItemPoolModal != null) {
+            return activeItemPoolModal.mouseClicked(mouseX, mouseY, button);
+        }
+        if (activeBannerSettingsModal != null) {
+            return activeBannerSettingsModal.mouseClicked(mouseX, mouseY, button);
+        }
         if (activeDetailsModal != null) {
             return activeDetailsModal.mouseClicked(mouseX, mouseY, button);
         }
@@ -129,7 +244,24 @@ public class GachaScreen extends Screen {
     }
 
     @Override
+    public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
+        if (activeItemPoolModal != null) {
+            return activeItemPoolModal.mouseScrolled(mouseX, mouseY, scrollX, scrollY);
+        }
+        return super.mouseScrolled(mouseX, mouseY, scrollX, scrollY);
+    }
+
+    @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        if (activeItemAddEditModal != null) {
+            return activeItemAddEditModal.keyPressed(keyCode, scanCode, modifiers);
+        }
+        if (activeItemPoolModal != null) {
+            return activeItemPoolModal.keyPressed(keyCode, scanCode, modifiers);
+        }
+        if (activeBannerSettingsModal != null) {
+            return activeBannerSettingsModal.keyPressed(keyCode, scanCode, modifiers);
+        }
         if (activeDetailsModal != null) {
             return activeDetailsModal.keyPressed(keyCode, scanCode, modifiers);
         }
@@ -137,8 +269,19 @@ public class GachaScreen extends Screen {
     }
 
     @Override
+    public boolean charTyped(char codePoint, int modifiers) {
+        if (activeItemAddEditModal != null) {
+            return activeItemAddEditModal.charTyped(codePoint, modifiers);
+        }
+        if (activeBannerSettingsModal != null) {
+            return activeBannerSettingsModal.charTyped(codePoint, modifiers);
+        }
+        return super.charTyped(codePoint, modifiers);
+    }
+
+    @Override
     public void renderBackground(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
-        // Prevent Minecraft 1.21.1 world blur / dark filter shader
+        // Prevent Minecraft 1.21.1 world blur
     }
 
     @Override
@@ -264,8 +407,15 @@ public class GachaScreen extends Screen {
 
         super.render(guiGraphics, mouseX, mouseY, partialTick);
 
+        // Render Active Modal Overlays
         if (activeDetailsModal != null) {
             activeDetailsModal.render(guiGraphics, mouseX, mouseY, partialTick, leftPos, topPos);
+        } else if (activeItemAddEditModal != null) {
+            activeItemAddEditModal.render(guiGraphics, mouseX, mouseY, partialTick, leftPos, topPos);
+        } else if (activeItemPoolModal != null) {
+            activeItemPoolModal.render(guiGraphics, mouseX, mouseY, partialTick, leftPos, topPos);
+        } else if (activeBannerSettingsModal != null) {
+            activeBannerSettingsModal.render(guiGraphics, mouseX, mouseY, partialTick, leftPos, topPos);
         }
     }
 
