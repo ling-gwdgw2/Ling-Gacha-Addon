@@ -52,15 +52,15 @@ public class GachaScreen extends Screen {
         int btnY = this.topPos + this.imageHeight - 26;
 
         this.detailsBtn = Button.builder(Component.literal("Details"), b -> openDetails())
-                .bounds(this.leftPos + 10, btnY, 60, 18).build();
+                .bounds(this.leftPos + 12, btnY, 65, 20).build();
         this.addRenderableWidget(detailsBtn);
 
         this.pull1Btn = Button.builder(Component.literal("Convene 1x"), b -> pull(1))
-                .bounds(this.leftPos + this.imageWidth - 195, btnY, 90, 18).build();
+                .bounds(this.leftPos + this.imageWidth - 265, btnY, 125, 20).build();
         this.addRenderableWidget(pull1Btn);
 
         this.pull10Btn = Button.builder(Component.literal("Convene 10x"), b -> pull(10))
-                .bounds(this.leftPos + this.imageWidth - 100, btnY, 90, 18).build();
+                .bounds(this.leftPos + this.imageWidth - 135, btnY, 125, 20).build();
         this.addRenderableWidget(pull10Btn);
 
         updateButtons();
@@ -109,7 +109,7 @@ public class GachaScreen extends Screen {
             return activeDetailsModal.mouseClicked(mouseX, mouseY, button);
         }
 
-        // Check Banner Sidebar tabs (Left side outside or inside)
+        // Check Banner Sidebar tabs
         List<SyncBannerDataPayload.ClientBannerInfo> banners = ClientGachaData.getBanners();
         int tabX = this.leftPos - 110;
         int tabY = this.topPos + 8;
@@ -137,8 +137,18 @@ public class GachaScreen extends Screen {
     }
 
     @Override
+    public void renderBackground(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
+        // Prevent Minecraft 1.21.1 world blur / dark filter shader
+    }
+
+    @Override
+    public void renderMenuBackground(GuiGraphics guiGraphics) {
+        // Prevent background blur
+    }
+
+    @Override
     public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
-        // Main Container Background (Dark Wuthering Sci-Fi Theme)
+        // Main Container Background (Solid Opaque Dark Wuthering Sci-Fi Theme)
         guiGraphics.fill(this.leftPos, this.topPos, this.leftPos + this.imageWidth, this.topPos + this.imageHeight, 0xFF0D0D18);
         guiGraphics.fill(this.leftPos + 1, this.topPos + 1, this.leftPos + this.imageWidth - 1, this.topPos + this.imageHeight - 1, 0xFF141422);
 
@@ -195,7 +205,7 @@ public class GachaScreen extends Screen {
         int contentW = this.imageWidth - 24;
         int contentH = this.imageHeight - 64;
 
-        // Banner Card Background (Gradient / Dark Sci-Fi Box)
+        // Banner Card Background
         guiGraphics.fill(contentX, contentY, contentX + contentW, contentY + contentH, 0xFF1A1A2E);
         guiGraphics.fill(contentX + 1, contentY + 1, contentX + contentW - 1, contentY + contentH - 1, 0xFF22223C);
 

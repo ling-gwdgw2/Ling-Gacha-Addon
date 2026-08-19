@@ -42,10 +42,10 @@ public class GachaRevealScreen extends Screen {
         this.pullAgainBtn = Button.builder(Component.literal(againText), b -> {
             PacketDistributor.sendToServer(new PullConvenePayload(result.bannerId(), pullCount));
             this.onClose();
-        }).bounds(this.width / 2 - 110, btnY, 105, 20).build();
+        }).bounds(this.width / 2 - 130, btnY, 125, 20).build();
 
         this.closeBtn = Button.builder(Component.literal("Confirm"), b -> this.onClose())
-                .bounds(this.width / 2 + 5, btnY, 105, 20).build();
+                .bounds(this.width / 2 + 5, btnY, 125, 20).build();
 
         this.addRenderableWidget(pullAgainBtn);
         this.addRenderableWidget(closeBtn);
@@ -76,9 +76,19 @@ public class GachaRevealScreen extends Screen {
     }
 
     @Override
+    public void renderBackground(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
+        // Prevent background blur
+    }
+
+    @Override
+    public void renderMenuBackground(GuiGraphics guiGraphics) {
+        // Prevent background blur
+    }
+
+    @Override
     public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
-        // Darkened Sci-Fi Background Overlay
-        guiGraphics.fill(0, 0, this.width, this.height, 0xF0080812);
+        // Solid Darkened Sci-Fi Background Overlay
+        guiGraphics.fill(0, 0, this.width, this.height, 0xFF080812);
 
         // Soundwave Frequency Wave Burst Animation (First ~1.25s)
         if (ticksElapsed < 25) {
