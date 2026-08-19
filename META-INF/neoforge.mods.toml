@@ -1,0 +1,34 @@
+modLoader="javafml"
+loaderVersion="[4,)"
+license="All Rights Reserved"
+
+[[mods]]
+modId="ling_gacha"
+version="1.0.0"
+displayName="Ling Gacha Addon"
+authors="HolySweet"
+description='''
+Wuthering Waves style Convene / Gacha system addon for ling_q_shop (FTB Quest Shop).
+Features 50/50 system, 80-pull pity, 10-pull 4-star guarantee, Soundwave animation, and custom banner pools!
+'''
+
+[[dependencies.ling_gacha]]
+modId="neoforge"
+type="required"
+versionRange="[21.1.0,)"
+ordering="NONE"
+side="BOTH"
+
+[[dependencies.ling_gacha]]
+modId="minecraft"
+type="required"
+versionRange="[1.21.1,1.22)"
+ordering="NONE"
+side="BOTH"
+
+[[dependencies.ling_gacha]]
+modId="ftb_qshop"
+type="required"
+versionRange="[1.0,)"
+ordering="AFTER"
+side="BOTH"
