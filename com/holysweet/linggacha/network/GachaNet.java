@@ -152,6 +152,7 @@ public class GachaNet {
                 (payload, context) -> context.enqueueWork(() -> {
                     if (FMLEnvironment.dist.isClient()) {
                         ClientGachaData.update(payload);
+                        ClientHooks.openGachaScreen();
                     }
                 })
         );
@@ -170,9 +171,6 @@ public class GachaNet {
 
     public static void openGachaForPlayer(ServerPlayer player) {
         syncDataToPlayer(player);
-        if (FMLEnvironment.dist.isClient()) {
-            ClientHooks.openGachaScreen();
-        }
     }
 
     public static void syncDataToPlayer(ServerPlayer player) {

@@ -29,6 +29,7 @@ public class GachaRevealScreen extends Screen {
     public GachaRevealScreen(ConveneResultPayload result) {
         super(Component.literal("Convene Results"));
         this.result = result;
+        this.minecraft = Minecraft.getInstance();
     }
 
     @Override

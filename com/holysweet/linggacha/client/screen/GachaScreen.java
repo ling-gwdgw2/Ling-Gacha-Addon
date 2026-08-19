@@ -47,6 +47,7 @@ public class GachaScreen extends Screen {
 
     public GachaScreen() {
         super(Component.literal("Convene / Gacha"));
+        this.minecraft = Minecraft.getInstance();
     }
 
     public int getGuiLeftPos() {

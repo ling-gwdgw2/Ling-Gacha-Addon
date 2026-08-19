@@ -12,21 +12,27 @@ import net.neoforged.api.distmarker.OnlyIn;
 public class ClientHooks {
 
     public static void openGachaScreen() {
-        if (Minecraft.getInstance().screen instanceof GachaScreen screen) {
-            // Already open, refresh UI
-            screen.refreshData();
-        } else {
-            Minecraft.getInstance().setScreen(new GachaScreen());
-        }
+        Minecraft.getInstance().execute(() -> {
+            Minecraft mc = Minecraft.getInstance();
+            if (mc.screen instanceof GachaScreen screen) {
+                screen.refreshData();
+            } else {
+                mc.setScreen(new GachaScreen());
+            }
+        });
     }
 
     public static void handleConveneResult(ConveneResultPayload payload) {
-        Minecraft.getInstance().setScreen(new GachaRevealScreen(payload));
+        Minecraft.getInstance().execute(() -> {
+            Minecraft.getInstance().setScreen(new GachaRevealScreen(payload));
+        });
     }
 
     public static void handleSyncItemPool(AdminSyncItemPoolPayload payload) {
-        if (Minecraft.getInstance().screen instanceof GachaScreen screen) {
-            screen.onItemPoolSynced(payload);
-        }
+        Minecraft.getInstance().execute(() -> {
+            if (Minecraft.getInstance().screen instanceof GachaScreen screen) {
+                screen.onItemPoolSynced(payload);
+            }
+        });
     }
 }
