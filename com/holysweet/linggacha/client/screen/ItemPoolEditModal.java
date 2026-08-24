@@ -34,19 +34,19 @@ public class ItemPoolEditModal {
         this.bannerTitle = bannerTitle;
     }
 
-    public void init(int leftPos, int topPos) {
-        int modalW = 320;
+    public void init(int screenWidth, int screenHeight) {
+        int modalW = 340;
         int modalH = 220;
-        int modalX = leftPos + (360 - modalW) / 2;
-        int modalY = topPos + (230 - modalH) / 2;
+        int modalX = (screenWidth - modalW) / 2;
+        int modalY = (screenHeight - modalH) / 2;
 
         int btnY = modalY + modalH - 24;
 
         this.addHandBtn = Button.builder(Component.literal("§a+ Add Hand Item"), b -> addFromHand())
-                .bounds(modalX + 15, btnY, 135, 18).build();
+                .bounds(modalX + 15, btnY, 145, 18).build();
 
         this.closeBtn = Button.builder(Component.literal("Close"), b -> parent.closeModal())
-                .bounds(modalX + 170, btnY, 135, 18).build();
+                .bounds(modalX + 180, btnY, 145, 18).build();
 
         // Request latest items from server
         PacketDistributor.sendToServer(new AdminRequestItemPoolPayload(bannerId));
@@ -68,14 +68,17 @@ public class ItemPoolEditModal {
         }
     }
 
-    public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick, int leftPos, int topPos) {
-        int modalW = 320;
+    public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick, int screenWidth, int screenHeight) {
+        int modalW = 340;
         int modalH = 220;
-        int modalX = leftPos + (360 - modalW) / 2;
-        int modalY = topPos + (230 - modalH) / 2;
+        int modalX = (screenWidth - modalW) / 2;
+        int modalY = (screenHeight - modalH) / 2;
 
         guiGraphics.pose().pushPose();
         guiGraphics.pose().translate(0, 0, 400.0F);
+
+        // Full Screen Dark Dim Backdrop
+        guiGraphics.fill(0, 0, screenWidth, screenHeight, 0xAA000000);
 
         // Dark Modal Background
         guiGraphics.fill(modalX, modalY, modalX + modalW, modalY + modalH, 0xFF0A0A16);
@@ -83,7 +86,7 @@ public class ItemPoolEditModal {
 
         // Header Title
         guiGraphics.fill(modalX + 1, modalY + 1, modalX + modalW - 1, modalY + 22, 0xFF2A1C40);
-        String header = "✦ POOL MANAGER: " + bannerTitle + " (" + items.size() + " items) ✦";
+        String header = "POOL MANAGER: " + bannerTitle + " (" + items.size() + " items)";
         guiGraphics.drawString(Minecraft.getInstance().font, header, modalX + 10, modalY + 7, 0xFFFFD700, true);
 
         // Item List Box
@@ -122,20 +125,20 @@ public class ItemPoolEditModal {
             String name = (item.customName() != null && !item.customName().isEmpty()) ? item.customName() : stack.getHoverName().getString();
             if (item.count() > 1) name = item.count() + "x " + name;
             if (item.isRateUp()) name += " §e[Rate-Up]";
-            if (Minecraft.getInstance().font.width(name) > 120) {
-                name = name.substring(0, Math.min(name.length(), 15)) + "..";
+            if (Minecraft.getInstance().font.width(name) > 130) {
+                name = name.substring(0, Math.min(name.length(), 16)) + "..";
             }
             guiGraphics.drawString(Minecraft.getInstance().font, name, listX + 65, rowY + 6, 0xFFFFFFFF, true);
 
             // Weight
             String weightStr = "W: " + item.weight();
-            guiGraphics.drawString(Minecraft.getInstance().font, weightStr, listX + 195, rowY + 6, 0xFFAAAAAA, true);
+            guiGraphics.drawString(Minecraft.getInstance().font, weightStr, listX + 205, rowY + 6, 0xFFAAAAAA, true);
 
-            // Edit button [E]
-            int editX = listX + listW - 48;
-            boolean editHovered = mouseX >= editX && mouseX <= editX + 20 && mouseY >= rowY + 2 && mouseY <= rowY + itemH - 4;
-            guiGraphics.fill(editX, rowY + 2, editX + 20, rowY + itemH - 4, editHovered ? 0xFF3D5A80 : 0xFF293241);
-            guiGraphics.drawString(Minecraft.getInstance().font, "Edit", editX + 2, rowY + 5, 0xFFE0FBFC, true);
+            // Edit button [Edit]
+            int editX = listX + listW - 60;
+            boolean editHovered = mouseX >= editX && mouseX <= editX + 32 && mouseY >= rowY + 2 && mouseY <= rowY + itemH - 4;
+            guiGraphics.fill(editX, rowY + 2, editX + 32, rowY + itemH - 4, editHovered ? 0xFF3D5A80 : 0xFF293241);
+            guiGraphics.drawString(Minecraft.getInstance().font, "Edit", editX + 6, rowY + 5, 0xFFE0FBFC, true);
 
             // Delete button [X]
             int delX = listX + listW - 24;
@@ -151,10 +154,10 @@ public class ItemPoolEditModal {
     }
 
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        int modalW = 320;
+        int modalW = 340;
         int modalH = 220;
-        int modalX = parent.getGuiLeftPos() + (360 - modalW) / 2;
-        int modalY = parent.getGuiTopPos() + (230 - modalH) / 2;
+        int modalX = (parent.width - modalW) / 2;
+        int modalY = (parent.height - modalH) / 2;
 
         int listX = modalX + 12;
         int listY = modalY + 26;
@@ -168,17 +171,19 @@ public class ItemPoolEditModal {
             AdminSyncItemPoolPayload.ItemEntryData item = items.get(idx);
             int rowY = listY + 2 + i * itemH;
 
-            // Check Edit Button
-            int editX = listX + listW - 48;
-            if (mouseX >= editX && mouseX <= editX + 20 && mouseY >= rowY + 2 && mouseY <= rowY + itemH - 4) {
-                parent.openItemEditModal(bannerId, item);
-                return true;
-            }
-
             // Check Delete Button
             int delX = listX + listW - 24;
             if (mouseX >= delX && mouseX <= delX + 20 && mouseY >= rowY + 2 && mouseY <= rowY + itemH - 4) {
                 PacketDistributor.sendToServer(new AdminRemoveGachaItemPayload(bannerId, item.index()));
+                return true;
+            }
+
+            // Check Edit Button or Clicking on the row
+            int editX = listX + listW - 60;
+            boolean clickedEditBtn = mouseX >= editX && mouseX <= editX + 32 && mouseY >= rowY + 2 && mouseY <= rowY + itemH - 4;
+            boolean clickedRow = mouseX >= listX && mouseX < delX && mouseY >= rowY && mouseY <= rowY + itemH - 2;
+            if (clickedEditBtn || clickedRow) {
+                parent.openItemEditModal(bannerId, item);
                 return true;
             }
         }
@@ -190,7 +195,10 @@ public class ItemPoolEditModal {
     }
 
     public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
-        int maxScroll = Math.max(0, items.size() - 6);
+        int listH = 220 - 56;
+        int itemH = 22;
+        int visibleCount = listH / itemH;
+        int maxScroll = Math.max(0, items.size() - visibleCount);
         if (maxScroll > 0) {
             if (scrollY > 0) {
                 scrollOffset = Math.max(0, scrollOffset - 1);
@@ -212,9 +220,9 @@ public class ItemPoolEditModal {
     }
 
     private String getStarsString(int stars) {
-        if (stars >= 5) return "5★";
-        if (stars == 4) return "4★";
-        return "3★";
+        if (stars >= 5) return "5-Star";
+        if (stars == 4) return "4-Star";
+        return "3-Star";
     }
 
     private ItemStack getItemStack(String itemId, int count) {

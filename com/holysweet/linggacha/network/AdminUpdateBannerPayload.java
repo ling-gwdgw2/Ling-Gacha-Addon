@@ -12,7 +12,8 @@ public record AdminUpdateBannerPayload(
         String bannerType,
         int cost,
         int discount,
-        String preview
+        String preview,
+        String backgroundImage
 ) implements CustomPacketPayload {
 
     public static final Type<AdminUpdateBannerPayload> TYPE = new Type<>(ResourceLocation.fromNamespaceAndPath("ling_gacha", "admin_update_banner"));
@@ -30,7 +31,8 @@ public record AdminUpdateBannerPayload(
                 buf.readUtf(),
                 buf.readVarInt(),
                 buf.readVarInt(),
-                buf.readUtf()
+                buf.readUtf(),
+                buf.readBoolean() ? buf.readUtf() : null
         );
     }
 
@@ -42,6 +44,8 @@ public record AdminUpdateBannerPayload(
         buf.writeVarInt(cost);
         buf.writeVarInt(discount);
         buf.writeUtf(preview);
+        buf.writeBoolean(backgroundImage != null);
+        if (backgroundImage != null) buf.writeUtf(backgroundImage);
     }
 
     @Override

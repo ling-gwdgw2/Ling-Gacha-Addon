@@ -35,4 +35,20 @@ public class ClientHooks {
             }
         });
     }
+
+    public static void handleSyncHistory(com.holysweet.linggacha.network.SyncPullHistoryPayload payload) {
+        Minecraft.getInstance().execute(() -> {
+            if (Minecraft.getInstance().screen instanceof GachaScreen screen) {
+                screen.onHistorySynced(payload);
+            }
+        });
+    }
+
+    public static void handleSyncMailbox(com.holysweet.linggacha.network.SyncMailboxPayload payload) {
+        Minecraft.getInstance().execute(() -> {
+            if (Minecraft.getInstance().screen instanceof GachaScreen screen) {
+                screen.onMailboxSynced(payload);
+            }
+        });
+    }
 }

@@ -18,24 +18,27 @@ public class GachaDetailsModal {
         this.banner = banner;
     }
 
-    public void init(int leftPos, int topPos) {
-        int modalW = 280;
-        int modalH = 190;
-        int modalX = leftPos + (360 - modalW) / 2;
-        int modalY = topPos + (230 - modalH) / 2;
+    public void init(int screenWidth, int screenHeight) {
+        int modalW = 300;
+        int modalH = 200;
+        int modalX = (screenWidth - modalW) / 2;
+        int modalY = (screenHeight - modalH) / 2;
 
         this.closeBtn = Button.builder(Component.literal("Close"), b -> parent.closeDetails())
                 .bounds(modalX + modalW / 2 - 40, modalY + modalH - 25, 80, 18).build();
     }
 
-    public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick, int leftPos, int topPos) {
-        int modalW = 280;
-        int modalH = 190;
-        int modalX = leftPos + (360 - modalW) / 2;
-        int modalY = topPos + (230 - modalH) / 2;
+    public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick, int screenWidth, int screenHeight) {
+        int modalW = 300;
+        int modalH = 200;
+        int modalX = (screenWidth - modalW) / 2;
+        int modalY = (screenHeight - modalH) / 2;
 
         guiGraphics.pose().pushPose();
         guiGraphics.pose().translate(0, 0, 400.0F);
+
+        // Full Screen Dark Dim Backdrop
+        guiGraphics.fill(0, 0, screenWidth, screenHeight, 0xAA000000);
 
         // Solid Dark Sci-Fi Modal Box
         guiGraphics.fill(modalX, modalY, modalX + modalW, modalY + modalH, 0xFF080812);

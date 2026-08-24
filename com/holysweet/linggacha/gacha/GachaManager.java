@@ -7,7 +7,9 @@ import com.google.gson.JsonObject;
 import com.holysweet.linggacha.network.GachaNet;
 import com.holysweet.questshop.service.CoinsService;
 import com.mojang.logging.LogUtils;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
@@ -42,7 +44,7 @@ public class GachaManager {
         return playerDataCache.computeIfAbsent(uuid, PlayerGachaData::load);
     }
 
-    public synchronized void addOrUpdateBanner(String id, String title, String subtitle, GachaBanner.BannerType type, int cost, int discount, String preview, MinecraftServer server) {
+    public synchronized void addOrUpdateBanner(String id, String title, String subtitle, GachaBanner.BannerType type, int cost, int discount, String preview, String background, MinecraftServer server) {
         Optional<GachaBanner> existing = getBanner(id);
         if (existing.isPresent()) {
             GachaBanner b = existing.get();
@@ -52,8 +54,9 @@ public class GachaManager {
             b.setCostPerPull(cost);
             b.setTenPullDiscountPercent(discount);
             b.setFeaturedPreviewItem(preview);
+            b.setBackgroundImage(background);
         } else {
-            GachaBanner newBanner = new GachaBanner(id, title, subtitle, type, cost, discount, preview);
+            GachaBanner newBanner = new GachaBanner(id, title, subtitle, type, cost, discount, preview, background);
             banners.add(newBanner);
         }
         saveBanners();
@@ -63,7 +66,13 @@ public class GachaManager {
     }
 
     public synchronized void deleteBanner(String id, MinecraftServer server) {
+        if (banners.size() <= 1) {
+            return; // Keep at least 1 banner
+        }
         banners.removeIf(b -> b.getId().equalsIgnoreCase(id));
+        if (banners.isEmpty()) {
+            createDefaultBanners();
+        }
         saveBanners();
         if (server != null) {
             syncAllOnlinePlayers(server);
@@ -123,19 +132,36 @@ public class GachaManager {
         // Deduct Primogems
         CoinsService.add(player.serverLevel(), player, -totalCost);
         com.holysweet.questshop.network.Net.syncBalance(player);
-
         PlayerGachaData data = getPlayerData(player.getUUID());
         List<GachaItemEntry> results = new ArrayList<>();
 
         for (int i = 0; i < pullCount; i++) {
+            int pityBefore = data.getPity5Star(bannerId);
             GachaItemEntry prize = rollSingle(player, banner, data);
             results.add(prize);
 
-            // Add item to inventory
-            ItemStack itemStack = prize.createItemStack(player.registryAccess());
-            if (!player.getInventory().add(itemStack)) {
-                player.drop(itemStack, false);
-            }
+            // Record pull history
+            String itemName = (prize.getCustomName() != null && !prize.getCustomName().isEmpty()) ? prize.getCustomName() : prize.getItemId();
+            data.addHistoryRecord(new PlayerGachaData.PullHistoryRecord(
+                    bannerId,
+                    prize.getItemId(),
+                    itemName,
+                    prize.getRarity().getStars(),
+                    System.currentTimeMillis(),
+                    pityBefore + 1
+            ));
+
+            // Add item to persistent Mailbox (Safe Storage)
+            data.addMailboxItem(new PlayerGachaData.MailboxItem(
+                    UUID.randomUUID().toString(),
+                    bannerId,
+                    prize.getItemId(),
+                    prize.getCount(),
+                    prize.getRarity().getStars(),
+                    prize.getCustomName(),
+                    prize.getSnbt(),
+                    System.currentTimeMillis()
+            ));
 
             // Award Corals
             if (prize.getRarity() == GachaRarity.FIVE_STAR) {
@@ -148,13 +174,98 @@ public class GachaManager {
         }
 
         data.save();
+        GachaNet.syncDataToPlayer(player);
         return results;
     }
 
+    public synchronized void claimMailboxItem(ServerPlayer player, String mailId) {
+        if (player == null || mailId == null) return;
+        PlayerGachaData data = getPlayerData(player.getUUID());
+        Optional<PlayerGachaData.MailboxItem> itemOpt = data.getMailbox().stream()
+                .filter(m -> m.getMailId().equals(mailId))
+                .findFirst();
+
+        if (itemOpt.isEmpty()) return;
+        PlayerGachaData.MailboxItem mailItem = itemOpt.get();
+
+        ItemStack stack = createItemStackFromMail(player, mailItem);
+        if (player.getInventory().add(stack)) {
+            data.removeMailboxItem(mailId);
+            data.save();
+            GachaNet.sendMailboxToPlayer(player);
+            GachaNet.syncDataToPlayer(player);
+            String name = (mailItem.getCustomName() != null) ? mailItem.getCustomName() : stack.getHoverName().getString();
+            player.sendSystemMessage(Component.literal("§a[Ling Gacha] Claimed: " + name + " x" + mailItem.getCount() + "!"));
+        } else {
+            player.sendSystemMessage(Component.literal("§c[Ling Gacha] Inventory full! Please free up space before claiming."));
+        }
+    }
+
+    public synchronized void claimAllMailboxItems(ServerPlayer player) {
+        if (player == null) return;
+        PlayerGachaData data = getPlayerData(player.getUUID());
+        List<PlayerGachaData.MailboxItem> items = new ArrayList<>(data.getMailbox());
+        if (items.isEmpty()) {
+            player.sendSystemMessage(Component.literal("§e[Ling Gacha] Mailbox is empty."));
+            return;
+        }
+
+        int claimedCount = 0;
+        int failedCount = 0;
+
+        for (PlayerGachaData.MailboxItem mailItem : items) {
+            ItemStack stack = createItemStackFromMail(player, mailItem);
+            if (player.getInventory().add(stack)) {
+                data.removeMailboxItem(mailItem.getMailId());
+                claimedCount++;
+            } else {
+                failedCount++;
+            }
+        }
+
+        data.save();
+        GachaNet.sendMailboxToPlayer(player);
+        GachaNet.syncDataToPlayer(player);
+
+        if (claimedCount > 0) {
+            player.sendSystemMessage(Component.literal("§a[Ling Gacha] Successfully claimed " + claimedCount + " item(s)!"));
+        }
+        if (failedCount > 0) {
+            player.sendSystemMessage(Component.literal("§c[Ling Gacha] Inventory full! " + failedCount + " item(s) remain safely in your Mailbox."));
+        }
+    }
+
+    private ItemStack createItemStackFromMail(ServerPlayer player, PlayerGachaData.MailboxItem mailItem) {
+        ItemStack stack = ItemStack.EMPTY;
+        if (mailItem.getSnbt() != null && !mailItem.getSnbt().isEmpty()) {
+            try {
+                var tag = net.minecraft.nbt.TagParser.parseTag(mailItem.getSnbt());
+                stack = ItemStack.parseOptional(player.registryAccess(), tag);
+            } catch (Exception ignored) {}
+        }
+        if (stack.isEmpty()) {
+            try {
+                ResourceLocation rl = ResourceLocation.parse(mailItem.getItemId());
+                var itemOpt = BuiltInRegistries.ITEM.getOptional(rl);
+                if (itemOpt.isPresent()) {
+                    stack = new ItemStack(itemOpt.get(), mailItem.getCount());
+                }
+            } catch (Exception ignored) {}
+        }
+        if (stack.isEmpty()) {
+            stack = new ItemStack(net.minecraft.world.item.Items.DIRT, mailItem.getCount());
+        }
+        if (mailItem.getCustomName() != null && !mailItem.getCustomName().isEmpty()) {
+            stack.set(net.minecraft.core.component.DataComponents.CUSTOM_NAME, Component.literal(mailItem.getCustomName()));
+        }
+        return stack;
+    }
+
     private GachaItemEntry rollSingle(ServerPlayer player, GachaBanner banner, PlayerGachaData data) {
-        data.incrementPity(banner.getBannerType());
-        int current5StarPity = data.getPity5Star(banner.getBannerType());
-        int current4StarPity = data.getPity4Star(banner.getBannerType());
+        String bannerId = banner.getId();
+        data.incrementPity(bannerId);
+        int current5StarPity = data.getPity5Star(bannerId);
+        int current4StarPity = data.getPity4Star(bannerId);
 
         // 1. Calculate 5-Star Probability with Soft & Hard Pity (Hard Pity at 80)
         double fiveStarChance = 0.008; // 0.8% base
@@ -173,10 +284,10 @@ public class GachaManager {
         double roll = ThreadLocalRandom.current().nextDouble();
 
         if (roll < fiveStarChance) {
-            data.resetPity5Star(banner.getBannerType());
+            data.resetPity5Star(bannerId);
             return selectFiveStar(player, banner, data);
         } else if (roll < (fiveStarChance + fourStarChance)) {
-            data.resetPity4Star(banner.getBannerType());
+            data.resetPity4Star(bannerId);
             return selectRandomItem(banner.getItemsByRarity(GachaRarity.FOUR_STAR));
         } else {
             return selectRandomItem(banner.getItemsByRarity(GachaRarity.THREE_STAR));
@@ -185,19 +296,20 @@ public class GachaManager {
 
     private GachaItemEntry selectFiveStar(ServerPlayer player, GachaBanner banner, PlayerGachaData data) {
         GachaItemEntry result;
+        String bannerId = banner.getId();
 
         if (banner.getBannerType() == GachaBanner.BannerType.FEATURED_RESONATOR) {
             List<GachaItemEntry> rateUp = banner.getRateUpItems(GachaRarity.FIVE_STAR);
             List<GachaItemEntry> standard = banner.getStandardItems(GachaRarity.FIVE_STAR);
 
-            if (data.isCharacterGuaranteedFeatured() || ThreadLocalRandom.current().nextDouble() < 0.5) {
+            if (data.isGuaranteed(bannerId) || ThreadLocalRandom.current().nextDouble() < 0.5) {
                 // Won 50/50 or was guaranteed
                 result = selectRandomItem(!rateUp.isEmpty() ? rateUp : banner.getItemsByRarity(GachaRarity.FIVE_STAR));
-                data.setCharacterGuaranteedFeatured(false);
+                data.setGuaranteed(bannerId, false);
             } else {
                 // Lost 50/50
                 result = selectRandomItem(!standard.isEmpty() ? standard : banner.getItemsByRarity(GachaRarity.FIVE_STAR));
-                data.setCharacterGuaranteedFeatured(true);
+                data.setGuaranteed(bannerId, true);
                 player.sendSystemMessage(Component.literal("§e[Convene] 50/50 lost! Your next 5★ is 100% guaranteed featured!"));
             }
         } else if (banner.getBannerType() == GachaBanner.BannerType.FEATURED_WEAPON) {
@@ -258,8 +370,9 @@ public class GachaManager {
                 int cost = obj.get("cost").getAsInt();
                 int discount = obj.has("discount") ? obj.get("discount").getAsInt() : 0;
                 String preview = obj.has("preview") ? obj.get("preview").getAsString() : "minecraft:netherite_sword";
+                String background = obj.has("background") ? obj.get("background").getAsString() : null;
 
-                GachaBanner banner = new GachaBanner(id, title, subtitle, type, cost, discount, preview);
+                GachaBanner banner = new GachaBanner(id, title, subtitle, type, cost, discount, preview, background);
 
                 if (obj.has("items")) {
                     JsonArray itemsArr = obj.getAsJsonArray("items");
@@ -289,7 +402,7 @@ public class GachaManager {
         banners.clear();
 
         // 1. Featured Resonator Banner (Changli / Mythic Blade)
-        GachaBanner charBanner = new GachaBanner("featured_character", "Vermillion Flight", "Featured 5★ Resonator & Gear (50/50)", GachaBanner.BannerType.FEATURED_RESONATOR, 160, 0, "minecraft:netherite_sword");
+        GachaBanner charBanner = new GachaBanner("featured_character", "Vermillion Flight", "Featured 5★ Resonator & Gear (50/50)", GachaBanner.BannerType.FEATURED_RESONATOR, 160, 0, "minecraft:netherite_sword", "ling_gacha:textures/gui/banners/featured_character.png");
         charBanner.addItem(new GachaItemEntry("minecraft:netherite_sword", 1, GachaRarity.FIVE_STAR, "Blazing Sunblade (5★ Rate-Up)", 10, true));
         charBanner.addItem(new GachaItemEntry("minecraft:elytra", 1, GachaRarity.FIVE_STAR, "Wings of Vermillion (5★ Standard)", 5, false));
         charBanner.addItem(new GachaItemEntry("minecraft:totem_of_undying", 2, GachaRarity.FIVE_STAR, "Resonator Rebirth Totem (5★ Standard)", 5, false));
@@ -304,7 +417,7 @@ public class GachaManager {
         banners.add(charBanner);
 
         // 2. Featured Weapon Banner (100% Guaranteed 5-Star Weapon)
-        GachaBanner weapBanner = new GachaBanner("featured_weapon", "Absolute Pulsation", "Featured 5★ Weapon (100% Guaranteed)", GachaBanner.BannerType.FEATURED_WEAPON, 160, 0, "minecraft:netherite_axe");
+        GachaBanner weapBanner = new GachaBanner("featured_weapon", "Absolute Pulsation", "Featured 5★ Weapon (100% Guaranteed)", GachaBanner.BannerType.FEATURED_WEAPON, 160, 0, "minecraft:netherite_axe", "ling_gacha:textures/gui/banners/featured_weapon.png");
         weapBanner.addItem(new GachaItemEntry("minecraft:netherite_axe", 1, GachaRarity.FIVE_STAR, "Verdant Summit (5★ Guaranteed)", 10, true));
         weapBanner.addItem(new GachaItemEntry("minecraft:trident", 1, GachaRarity.FOUR_STAR, "Tidecaller Spear (4★)", 25, true));
         weapBanner.addItem(new GachaItemEntry("minecraft:bow", 1, GachaRarity.FOUR_STAR, "Whisperwind Bow (4★)", 25, true));
@@ -313,7 +426,7 @@ public class GachaManager {
         banners.add(weapBanner);
 
         // 3. Standard Convene (Permanent Pool)
-        GachaBanner stdBanner = new GachaBanner("standard_convene", "Tidal Cadence", "Standard Permanent Convene", GachaBanner.BannerType.STANDARD, 160, 0, "minecraft:nether_star");
+        GachaBanner stdBanner = new GachaBanner("standard_convene", "Tidal Cadence", "Standard Permanent Convene", GachaBanner.BannerType.STANDARD, 160, 0, "minecraft:nether_star", "ling_gacha:textures/gui/banners/standard_convene.png");
         stdBanner.addItem(new GachaItemEntry("minecraft:nether_star", 1, GachaRarity.FIVE_STAR, "Celestial Star Core (5★)", 10, false));
         stdBanner.addItem(new GachaItemEntry("minecraft:dragon_egg", 1, GachaRarity.FIVE_STAR, "Dragon Heart (5★)", 5, false));
         stdBanner.addItem(new GachaItemEntry("minecraft:shulker_box", 2, GachaRarity.FOUR_STAR, "Pocket Void Storage (4★)", 25, false));
@@ -341,6 +454,9 @@ public class GachaManager {
                 obj.addProperty("cost", banner.getCostPerPull());
                 obj.addProperty("discount", banner.getTenPullDiscountPercent());
                 obj.addProperty("preview", banner.getFeaturedPreviewItem());
+                if (banner.getBackgroundImage() != null && !banner.getBackgroundImage().trim().isEmpty()) {
+                    obj.addProperty("background", banner.getBackgroundImage().trim());
+                }
 
                 JsonArray itemsArr = new JsonArray();
                 for (GachaItemEntry item : banner.getItems()) {

@@ -8,7 +8,7 @@ import net.minecraft.resources.ResourceLocation;
 import java.util.ArrayList;
 import java.util.List;
 
-public record SyncBannerDataPayload(List<ClientBannerInfo> banners, int charPity5, int weapPity5, int stdPity5, int corals, boolean isGuaranteed) implements CustomPacketPayload {
+public record SyncBannerDataPayload(List<ClientBannerInfo> banners, int charPity5, int weapPity5, int stdPity5, int corals, boolean isGuaranteed, int mailboxCount) implements CustomPacketPayload {
 
     public static final Type<SyncBannerDataPayload> TYPE = new Type<>(ResourceLocation.fromNamespaceAndPath("ling_gacha", "sync_banners"));
 
@@ -27,7 +27,9 @@ public record SyncBannerDataPayload(List<ClientBannerInfo> banners, int charPity
             String previewItem,
             String featuredItemName,
             String featuredSnbt,
-            int totalItems
+            String backgroundImage,
+            int totalItems,
+            int currentPity5
     ) {
         public static ClientBannerInfo read(FriendlyByteBuf buf) {
             return new ClientBannerInfo(
@@ -40,6 +42,8 @@ public record SyncBannerDataPayload(List<ClientBannerInfo> banners, int charPity
                     buf.readUtf(),
                     buf.readBoolean() ? buf.readUtf() : null,
                     buf.readBoolean() ? buf.readUtf() : null,
+                    buf.readBoolean() ? buf.readUtf() : null,
+                    buf.readVarInt(),
                     buf.readVarInt()
             );
         }
@@ -56,7 +60,10 @@ public record SyncBannerDataPayload(List<ClientBannerInfo> banners, int charPity
             if (featuredItemName != null) buf.writeUtf(featuredItemName);
             buf.writeBoolean(featuredSnbt != null);
             if (featuredSnbt != null) buf.writeUtf(featuredSnbt);
+            buf.writeBoolean(backgroundImage != null);
+            if (backgroundImage != null) buf.writeUtf(backgroundImage);
             buf.writeVarInt(totalItems);
+            buf.writeVarInt(currentPity5);
         }
     }
 
@@ -67,7 +74,8 @@ public record SyncBannerDataPayload(List<ClientBannerInfo> banners, int charPity
                 buf.readVarInt(),
                 buf.readVarInt(),
                 buf.readVarInt(),
-                buf.readBoolean()
+                buf.readBoolean(),
+                buf.readVarInt()
         );
     }
 
@@ -90,6 +98,7 @@ public record SyncBannerDataPayload(List<ClientBannerInfo> banners, int charPity
         buf.writeVarInt(stdPity5);
         buf.writeVarInt(corals);
         buf.writeBoolean(isGuaranteed);
+        buf.writeVarInt(mailboxCount);
     }
 
     @Override

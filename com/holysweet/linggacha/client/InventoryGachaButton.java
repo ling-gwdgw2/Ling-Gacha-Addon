@@ -2,13 +2,12 @@ package com.holysweet.linggacha.client;
 
 import com.holysweet.linggacha.LingGachaMod;
 import com.holysweet.linggacha.network.RequestOpenGachaPayload;
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.screens.PauseScreen;
 import net.minecraft.network.chat.Component;
-import net.minecraft.world.item.ItemStack;
+import net.minecraft.resources.ResourceLocation;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -20,50 +19,46 @@ import net.neoforged.neoforge.network.PacketDistributor;
 @EventBusSubscriber(modid = LingGachaMod.MODID, value = Dist.CLIENT)
 public class InventoryGachaButton {
 
-    public static class GachaMenuButton extends Button {
-        private final ItemStack tokenStack;
+    private static final ResourceLocation ICON_TEXTURE =
+            ResourceLocation.fromNamespaceAndPath(LingGachaMod.MODID, "textures/gui/icon.png");
 
-        public GachaMenuButton(int x, int y, OnPress onPress, Tooltip tooltip) {
-            super(x, y, 20, 20, Component.empty(), onPress, DEFAULT_NARRATION);
+    public static class GachaMenuButton extends Button {
+
+        public GachaMenuButton(int x, int y, int width, int height, OnPress onPress, Tooltip tooltip) {
+            super(x, y, width, height, Component.empty(), onPress, DEFAULT_NARRATION);
             setTooltip(tooltip);
-            this.tokenStack = (LingGachaMod.CONVENE_TIDE != null && LingGachaMod.CONVENE_TIDE.get() != null)
-                    ? new ItemStack(LingGachaMod.CONVENE_TIDE.get())
-                    : ItemStack.EMPTY;
         }
 
         @Override
         protected void renderWidget(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
             super.renderWidget(guiGraphics, mouseX, mouseY, partialTick);
 
-            if (!this.tokenStack.isEmpty()) {
-                guiGraphics.renderItem(this.tokenStack, this.getX() + 2, this.getY() + 2);
-            } else {
-                int starColor = this.isHoveredOrFocused() ? 0xFFFFD700 : 0xFFE0AAFF;
-                guiGraphics.drawString(Minecraft.getInstance().font, "✦", this.getX() + 6, this.getY() + 6, starColor, true);
-            }
+            int iconSize = Math.min(this.width - 2, this.height - 2);
+            int iconX = this.getX() + (this.width - iconSize) / 2;
+            int iconY = this.getY() + (this.height - iconSize) / 2;
+
+            guiGraphics.blit(ICON_TEXTURE, iconX, iconY, 0.0F, 0.0F, iconSize, iconSize, iconSize, iconSize);
         }
     }
 
     @SubscribeEvent
     public static void onScreenInit(ScreenEvent.Init.Post event) {
-        // Place Gacha button in the PauseScreen (Game Menu / ESC Menu)
+
+        // 2. Add Gacha Icon Button to Game Pause Menu (ESC Menu)
         if (event.getScreen() instanceof PauseScreen screen) {
             int centerX = screen.width / 2;
             int startY = screen.height / 4;
 
-            // Positioned symmetrically on the right side of the menu (Right of 'Report Bugs' button, above 's' button)
             int x = centerX + 102 + 4;
             int y = startY + 72;
 
-            GachaMenuButton gachaBtn = new GachaMenuButton(
-                    x, y,
-                    btn -> {
-                        PacketDistributor.sendToServer(new RequestOpenGachaPayload());
-                    },
-                    Tooltip.create(Component.literal("Convene / Gacha (唤取)"))
+            GachaMenuButton pauseBtn = new GachaMenuButton(
+                    x, y, 20, 20,
+                    btn -> PacketDistributor.sendToServer(new RequestOpenGachaPayload()),
+                    Tooltip.create(Component.literal("Ling Gacha (เปิดตู้สุ่มกาชา)"))
             );
 
-            event.addListener(gachaBtn);
+            event.addListener(pauseBtn);
         }
     }
 }

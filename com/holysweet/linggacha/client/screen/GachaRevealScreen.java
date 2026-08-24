@@ -42,14 +42,25 @@ public class GachaRevealScreen extends Screen {
 
         this.pullAgainBtn = Button.builder(Component.literal(againText), b -> {
             PacketDistributor.sendToServer(new PullConvenePayload(result.bannerId(), pullCount));
-            this.onClose();
+            returnToGachaScreen();
         }).bounds(this.width / 2 - 130, btnY, 125, 20).build();
 
-        this.closeBtn = Button.builder(Component.literal("Confirm"), b -> this.onClose())
+        this.closeBtn = Button.builder(Component.literal("Confirm"), b -> returnToGachaScreen())
                 .bounds(this.width / 2 + 5, btnY, 125, 20).build();
 
         this.addRenderableWidget(pullAgainBtn);
         this.addRenderableWidget(closeBtn);
+    }
+
+    private void returnToGachaScreen() {
+        if (this.minecraft != null) {
+            this.minecraft.setScreen(new GachaScreen());
+        }
+    }
+
+    @Override
+    public void onClose() {
+        super.onClose(); // Standard Minecraft ESC exit behavior (closes screen to world/pause)
     }
 
     @Override
@@ -69,11 +80,21 @@ public class GachaRevealScreen extends Screen {
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        if (ticksElapsed < 25) {
-            ticksElapsed = 25; // Skip animation on click
+        int maxTicks = getAnimationDurationTicks();
+        if (ticksElapsed < maxTicks) {
+            ticksElapsed = maxTicks; // Skip animation on click
             return true;
         }
         return super.mouseClicked(mouseX, mouseY, button);
+    }
+
+    private int getAnimationDurationTicks() {
+        com.holysweet.linggacha.client.animation.AnimatedTexture customAnim =
+                com.holysweet.linggacha.client.animation.AnimationManager.getPullAnimation(result.highestStars());
+        if (customAnim != null) {
+            return Math.max(20, (customAnim.getTotalDurationMs() / 50));
+        }
+        return 25; // Default 1.25s
     }
 
     @Override
@@ -91,14 +112,26 @@ public class GachaRevealScreen extends Screen {
         // Solid Darkened Sci-Fi Background Overlay
         guiGraphics.fill(0, 0, this.width, this.height, 0xFF080812);
 
-        // Soundwave Frequency Wave Burst Animation (First ~1.25s)
-        if (ticksElapsed < 25) {
-            renderSoundwaveAnimation(guiGraphics);
+        int maxTicks = getAnimationDurationTicks();
+
+        // Custom Pull Animation (.gif / .afma) or Soundwave Frequency Wave Burst
+        if (ticksElapsed < maxTicks) {
+            boolean customPlayed = com.holysweet.linggacha.client.animation.AnimationManager.renderPullAnimation(
+                    guiGraphics, result.highestStars(), 0, 0, this.width, this.height, ticksElapsed * 50L
+            );
+            if (!customPlayed) {
+                renderSoundwaveAnimation(guiGraphics);
+            } else {
+                String skipText = "Convening Resonance... (Click to Skip)";
+                int cx = this.width / 2;
+                int cy = this.height - 40;
+                guiGraphics.drawString(this.font, skipText, cx - this.font.width(skipText) / 2, cy, 0xFFFFD700, true);
+            }
             return;
         }
 
         // Title Header
-        String titleText = result.highestStars() >= 5 ? "✦✦✦ 5-STAR RESONANCE DISCOVERED! ✦✦✦" : "CONVENE RESULTS // 唤取结果";
+        String titleText = result.highestStars() >= 5 ? "5-STAR RESONANCE DISCOVERED!" : "CONVENE RESULTS";
         int titleColor = result.highestStars() >= 5 ? 0xFFFFD700 : (result.highestStars() == 4 ? 0xFFC77DFF : 0xFF4CC9F0);
         guiGraphics.drawString(this.font, titleText, this.width / 2 - this.font.width(titleText) / 2, 20, titleColor, true);
 
@@ -144,8 +177,8 @@ public class GachaRevealScreen extends Screen {
     }
 
     private void renderSinglePrize(GuiGraphics guiGraphics, ConveneResultPayload.PrizeData prize) {
-        int cardW = 120;
-        int cardH = 150;
+        int cardW = 150;
+        int cardH = 190;
         int cardX = this.width / 2 - cardW / 2;
         int cardY = this.height / 2 - cardH / 2 - 10;
 
@@ -159,30 +192,30 @@ public class GachaRevealScreen extends Screen {
         // Render Item
         ItemStack stack = getItemStack(prize.itemId(), prize.count());
         guiGraphics.pose().pushPose();
-        guiGraphics.pose().translate(cardX + cardW / 2 - 20, cardY + 25, 0);
-        guiGraphics.pose().scale(2.5F, 2.5F, 2.5F);
+        guiGraphics.pose().translate(cardX + cardW / 2 - 24, cardY + 30, 0);
+        guiGraphics.pose().scale(3.0F, 3.0F, 3.0F);
         guiGraphics.renderItem(stack, 0, 0);
         guiGraphics.pose().popPose();
 
         // Stars Display
         String stars = getStarsString(prize.stars());
-        guiGraphics.drawString(this.font, stars, cardX + cardW / 2 - this.font.width(stars) / 2, cardY + 80, borderColor, true);
+        guiGraphics.drawString(this.font, stars, cardX + cardW / 2 - this.font.width(stars) / 2, cardY + 105, borderColor, true);
 
         // Item Name & Count
         String name = (prize.name() != null && !prize.name().isEmpty()) ? prize.name() : stack.getHoverName().getString();
         if (prize.count() > 1) name = prize.count() + "x " + name;
-        guiGraphics.drawString(this.font, name, cardX + cardW / 2 - this.font.width(name) / 2, cardY + 98, 0xFFFFFFFF, true);
+        guiGraphics.drawString(this.font, name, cardX + cardW / 2 - this.font.width(name) / 2, cardY + 125, 0xFFFFFFFF, true);
     }
 
     private void renderTenPrizes(GuiGraphics guiGraphics, List<ConveneResultPayload.PrizeData> prizes) {
-        int cardW = 58;
-        int cardH = 75;
-        int gapX = 8;
-        int gapY = 8;
+        int cardW = 68;
+        int cardH = 88;
+        int gapX = 10;
+        int gapY = 10;
 
         int totalW = 5 * cardW + 4 * gapX;
         int startX = this.width / 2 - totalW / 2;
-        int startY = this.height / 2 - cardH - 5;
+        int startY = this.height / 2 - cardH - 10;
 
         for (int i = 0; i < prizes.size() && i < 10; i++) {
             ConveneResultPayload.PrizeData prize = prizes.get(i);
@@ -199,21 +232,21 @@ public class GachaRevealScreen extends Screen {
             guiGraphics.fill(x + 1, y + 1, x + cardW - 1, y + cardH - 1, bgColor);
 
             ItemStack stack = getItemStack(prize.itemId(), prize.count());
-            guiGraphics.renderItem(stack, x + cardW / 2 - 8, y + 10);
-            guiGraphics.renderItemDecorations(this.font, stack, x + cardW / 2 - 8, y + 10);
+            guiGraphics.renderItem(stack, x + cardW / 2 - 8, y + 12);
+            guiGraphics.renderItemDecorations(this.font, stack, x + cardW / 2 - 8, y + 12);
 
             String stars = getStarsString(prize.stars());
-            guiGraphics.drawString(this.font, stars, x + cardW / 2 - this.font.width(stars) / 2, y + 34, borderColor, true);
+            guiGraphics.drawString(this.font, stars, x + cardW / 2 - this.font.width(stars) / 2, y + 42, borderColor, true);
 
             String name = (prize.name() != null && !prize.name().isEmpty()) ? prize.name() : stack.getHoverName().getString();
             if (this.font.width(name) > cardW - 4) {
-                name = name.substring(0, Math.min(name.length(), 7)) + "..";
+                name = name.substring(0, Math.min(name.length(), 8)) + "..";
             }
-            guiGraphics.drawString(this.font, name, x + cardW / 2 - this.font.width(name) / 2, y + 48, 0xFFFFFFFF, true);
+            guiGraphics.drawString(this.font, name, x + cardW / 2 - this.font.width(name) / 2, y + 58, 0xFFFFFFFF, true);
 
             if (prize.count() > 1) {
                 String countStr = "x" + prize.count();
-                guiGraphics.drawString(this.font, countStr, x + cardW / 2 - this.font.width(countStr) / 2, y + 60, 0xFFAAAAAA, true);
+                guiGraphics.drawString(this.font, countStr, x + cardW / 2 - this.font.width(countStr) / 2, y + 72, 0xFFAAAAAA, true);
             }
         }
     }
@@ -231,9 +264,9 @@ public class GachaRevealScreen extends Screen {
     }
 
     private String getStarsString(int stars) {
-        if (stars >= 5) return "★★★★★";
-        if (stars == 4) return "★★★★";
-        return "★★★";
+        if (stars >= 5) return "5-Star";
+        if (stars == 4) return "4-Star";
+        return "3-Star";
     }
 
     private ItemStack getItemStack(String itemId, int count) {

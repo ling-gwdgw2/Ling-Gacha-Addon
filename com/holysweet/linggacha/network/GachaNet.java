@@ -38,8 +38,7 @@ public class GachaNet {
                         if (!results.isEmpty()) {
                             int highestStars = results.stream().mapToInt(r -> r.getRarity().getStars()).max().orElse(3);
                             PlayerGachaData data = GachaManager.INSTANCE.getPlayerData(player.getUUID());
-                            GachaBanner banner = GachaManager.INSTANCE.getBanner(payload.bannerId()).orElse(null);
-                            int pity5 = banner != null ? data.getPity5Star(banner.getBannerType()) : 0;
+                            int pity5 = data.getPity5Star(payload.bannerId());
 
                             List<ConveneResultPayload.PrizeData> prizeList = new ArrayList<>();
                             for (GachaItemEntry item : results) {
@@ -57,13 +56,19 @@ public class GachaNet {
                 AdminUpdateBannerPayload.TYPE,
                 AdminUpdateBannerPayload.STREAM_CODEC,
                 (payload, context) -> context.enqueueWork(() -> {
-                    if (context.player() instanceof ServerPlayer player && (player.hasPermissions(2) || player.isCreative())) {
-                        GachaBanner.BannerType type = GachaBanner.BannerType.valueOf(payload.bannerType());
-                        GachaManager.INSTANCE.addOrUpdateBanner(
-                                payload.id(), payload.title(), payload.subtitle(), type,
-                                payload.cost(), payload.discount(), payload.preview(),
-                                player.getServer()
-                        );
+                    if (context.player() instanceof ServerPlayer player) {
+                        if (canAdmin(player)) {
+                            GachaBanner.BannerType type = GachaBanner.BannerType.valueOf(payload.bannerType());
+                            GachaManager.INSTANCE.addOrUpdateBanner(
+                                     payload.id(), payload.title(), payload.subtitle(), type,
+                                     payload.cost(), payload.discount(), payload.preview(),
+                                     payload.backgroundImage(),
+                                     player.getServer()
+                            );
+                            player.sendSystemMessage(net.minecraft.network.chat.Component.literal("§a[Ling Gacha Admin] Banner '" + payload.title() + "' saved successfully!"));
+                        } else {
+                            player.sendSystemMessage(net.minecraft.network.chat.Component.literal("§c[Ling Gacha Admin] Permission denied! Requires OP level 2 or Creative mode."));
+                        }
                     }
                 })
         );
@@ -73,8 +78,13 @@ public class GachaNet {
                 AdminDeleteBannerPayload.TYPE,
                 AdminDeleteBannerPayload.STREAM_CODEC,
                 (payload, context) -> context.enqueueWork(() -> {
-                    if (context.player() instanceof ServerPlayer player && (player.hasPermissions(2) || player.isCreative())) {
-                        GachaManager.INSTANCE.deleteBanner(payload.id(), player.getServer());
+                    if (context.player() instanceof ServerPlayer player) {
+                        if (canAdmin(player)) {
+                            GachaManager.INSTANCE.deleteBanner(payload.id(), player.getServer());
+                            player.sendSystemMessage(net.minecraft.network.chat.Component.literal("§e[Ling Gacha Admin] Banner deleted."));
+                        } else {
+                            player.sendSystemMessage(net.minecraft.network.chat.Component.literal("§c[Ling Gacha Admin] Permission denied! Requires OP level 2 or Creative mode."));
+                        }
                     }
                 })
         );
@@ -84,13 +94,18 @@ public class GachaNet {
                 AdminAddGachaItemPayload.TYPE,
                 AdminAddGachaItemPayload.STREAM_CODEC,
                 (payload, context) -> context.enqueueWork(() -> {
-                    if (context.player() instanceof ServerPlayer player && (player.hasPermissions(2) || player.isCreative())) {
-                        GachaRarity rarity = GachaRarity.fromStars(payload.stars());
-                        GachaItemEntry entry = new GachaItemEntry(
-                                payload.itemId(), payload.count(), rarity, payload.customName(), payload.weight(), payload.isRateUp(), payload.snbt()
-                        );
-                        GachaManager.INSTANCE.addItemToBanner(payload.bannerId(), entry, player.getServer());
-                        sendItemPoolToPlayer(player, payload.bannerId());
+                    if (context.player() instanceof ServerPlayer player) {
+                        if (canAdmin(player)) {
+                            GachaRarity rarity = GachaRarity.fromStars(payload.stars());
+                            GachaItemEntry entry = new GachaItemEntry(
+                                    payload.itemId(), payload.count(), rarity, payload.customName(), payload.weight(), payload.isRateUp(), payload.snbt()
+                            );
+                            GachaManager.INSTANCE.addItemToBanner(payload.bannerId(), entry, player.getServer());
+                            sendItemPoolToPlayer(player, payload.bannerId());
+                            player.sendSystemMessage(net.minecraft.network.chat.Component.literal("§a[Ling Gacha Admin] Item added to pool."));
+                        } else {
+                            player.sendSystemMessage(net.minecraft.network.chat.Component.literal("§c[Ling Gacha Admin] Permission denied! Requires OP level 2 or Creative mode."));
+                        }
                     }
                 })
         );
@@ -100,13 +115,18 @@ public class GachaNet {
                 AdminUpdateGachaItemPayload.TYPE,
                 AdminUpdateGachaItemPayload.STREAM_CODEC,
                 (payload, context) -> context.enqueueWork(() -> {
-                    if (context.player() instanceof ServerPlayer player && (player.hasPermissions(2) || player.isCreative())) {
-                        GachaRarity rarity = GachaRarity.fromStars(payload.stars());
-                        GachaItemEntry entry = new GachaItemEntry(
-                                payload.itemId(), payload.count(), rarity, payload.customName(), payload.weight(), payload.isRateUp(), payload.snbt()
-                        );
-                        GachaManager.INSTANCE.updateItemInBanner(payload.bannerId(), payload.itemIndex(), entry, player.getServer());
-                        sendItemPoolToPlayer(player, payload.bannerId());
+                    if (context.player() instanceof ServerPlayer player) {
+                        if (canAdmin(player)) {
+                            GachaRarity rarity = GachaRarity.fromStars(payload.stars());
+                            GachaItemEntry entry = new GachaItemEntry(
+                                    payload.itemId(), payload.count(), rarity, payload.customName(), payload.weight(), payload.isRateUp(), payload.snbt()
+                            );
+                            GachaManager.INSTANCE.updateItemInBanner(payload.bannerId(), payload.itemIndex(), entry, player.getServer());
+                            sendItemPoolToPlayer(player, payload.bannerId());
+                            player.sendSystemMessage(net.minecraft.network.chat.Component.literal("§a[Ling Gacha Admin] Item updated."));
+                        } else {
+                            player.sendSystemMessage(net.minecraft.network.chat.Component.literal("§c[Ling Gacha Admin] Permission denied! Requires OP level 2 or Creative mode."));
+                        }
                     }
                 })
         );
@@ -116,9 +136,14 @@ public class GachaNet {
                 AdminRemoveGachaItemPayload.TYPE,
                 AdminRemoveGachaItemPayload.STREAM_CODEC,
                 (payload, context) -> context.enqueueWork(() -> {
-                    if (context.player() instanceof ServerPlayer player && (player.hasPermissions(2) || player.isCreative())) {
-                        GachaManager.INSTANCE.removeItemFromBanner(payload.bannerId(), payload.itemIndex(), player.getServer());
-                        sendItemPoolToPlayer(player, payload.bannerId());
+                    if (context.player() instanceof ServerPlayer player) {
+                        if (canAdmin(player)) {
+                            GachaManager.INSTANCE.removeItemFromBanner(payload.bannerId(), payload.itemIndex(), player.getServer());
+                            sendItemPoolToPlayer(player, payload.bannerId());
+                            player.sendSystemMessage(net.minecraft.network.chat.Component.literal("§e[Ling Gacha Admin] Item removed from pool."));
+                        } else {
+                            player.sendSystemMessage(net.minecraft.network.chat.Component.literal("§c[Ling Gacha Admin] Permission denied! Requires OP level 2 or Creative mode."));
+                        }
                     }
                 })
         );
@@ -129,12 +154,27 @@ public class GachaNet {
                 AdminRequestItemPoolPayload.STREAM_CODEC,
                 (payload, context) -> context.enqueueWork(() -> {
                     if (context.player() instanceof ServerPlayer player) {
-                        sendItemPoolToPlayer(player, payload.bannerId());
+                        if (canAdmin(player)) {
+                            sendItemPoolToPlayer(player, payload.bannerId());
+                        } else {
+                            player.sendSystemMessage(net.minecraft.network.chat.Component.literal("§c[Ling Gacha Admin] Permission denied! Requires OP level 2 or Creative mode."));
+                        }
                     }
                 })
         );
 
-        // 9. Convene Result Response (Server -> Client)
+        // 9. Client Request History (Client -> Server)
+        registrar.playToServer(
+                RequestPullHistoryPayload.TYPE,
+                RequestPullHistoryPayload.STREAM_CODEC,
+                (payload, context) -> context.enqueueWork(() -> {
+                    if (context.player() instanceof ServerPlayer player) {
+                        sendHistoryToPlayer(player, payload.bannerFilter());
+                    }
+                })
+        );
+
+        // 10. Convene Result Response (Server -> Client)
         registrar.playToClient(
                 ConveneResultPayload.TYPE,
                 ConveneResultPayload.STREAM_CODEC,
@@ -145,7 +185,7 @@ public class GachaNet {
                 })
         );
 
-        // 10. Sync Banner Data (Server -> Client)
+        // 11. Sync Banner Data (Server -> Client)
         registrar.playToClient(
                 SyncBannerDataPayload.TYPE,
                 SyncBannerDataPayload.STREAM_CODEC,
@@ -157,7 +197,7 @@ public class GachaNet {
                 })
         );
 
-        // 11. Admin Sync Item Pool (Server -> Client)
+        // 12. Admin Sync Item Pool (Server -> Client)
         registrar.playToClient(
                 AdminSyncItemPoolPayload.TYPE,
                 AdminSyncItemPoolPayload.STREAM_CODEC,
@@ -167,6 +207,84 @@ public class GachaNet {
                     }
                 })
         );
+
+        // 13. Sync Pull History (Server -> Client)
+        registrar.playToClient(
+                SyncPullHistoryPayload.TYPE,
+                SyncPullHistoryPayload.STREAM_CODEC,
+                (payload, context) -> context.enqueueWork(() -> {
+                    if (FMLEnvironment.dist.isClient()) {
+                        ClientHooks.handleSyncHistory(payload);
+                    }
+                })
+        );
+
+        // 14. Client Request Mailbox (Client -> Server)
+        registrar.playToServer(
+                RequestMailboxPayload.TYPE,
+                RequestMailboxPayload.STREAM_CODEC,
+                (payload, context) -> context.enqueueWork(() -> {
+                    if (context.player() instanceof ServerPlayer player) {
+                        sendMailboxToPlayer(player);
+                    }
+                })
+        );
+
+        // 15. Server Sync Mailbox (Server -> Client)
+        registrar.playToClient(
+                SyncMailboxPayload.TYPE,
+                SyncMailboxPayload.STREAM_CODEC,
+                (payload, context) -> context.enqueueWork(() -> {
+                    if (FMLEnvironment.dist.isClient()) {
+                        ClientHooks.handleSyncMailbox(payload);
+                    }
+                })
+        );
+
+        // 16. Client Claim Mailbox Item (Client -> Server)
+        registrar.playToServer(
+                ClaimMailboxItemPayload.TYPE,
+                ClaimMailboxItemPayload.STREAM_CODEC,
+                (payload, context) -> context.enqueueWork(() -> {
+                    if (context.player() instanceof ServerPlayer player) {
+                        if ("ALL".equalsIgnoreCase(payload.mailId())) {
+                            GachaManager.INSTANCE.claimAllMailboxItems(player);
+                        } else {
+                            GachaManager.INSTANCE.claimMailboxItem(player, payload.mailId());
+                        }
+                    }
+                })
+        );
+    }
+
+    public static void sendHistoryToPlayer(ServerPlayer player, String bannerFilter) {
+        PlayerGachaData data = GachaManager.INSTANCE.getPlayerData(player.getUUID());
+        List<PlayerGachaData.PullHistoryRecord> all = data.getHistory();
+        List<SyncPullHistoryPayload.HistoryRecordData> filtered = new ArrayList<>();
+
+        String filter = (bannerFilter == null || bannerFilter.isEmpty()) ? "ALL" : bannerFilter;
+
+        for (PlayerGachaData.PullHistoryRecord r : all) {
+            if (filter.equalsIgnoreCase("ALL") || r.getBannerId().equalsIgnoreCase(filter)) {
+                filtered.add(new SyncPullHistoryPayload.HistoryRecordData(
+                        r.getBannerId(), r.getItemId(), r.getItemName(), r.getStars(), r.getTimestamp(), r.getPityCount()
+                ));
+            }
+        }
+
+        int pity5 = filter.equalsIgnoreCase("ALL") ? 0 : data.getPity5Star(filter);
+        int pity4 = filter.equalsIgnoreCase("ALL") ? 0 : data.getPity4Star(filter);
+        boolean guaranteed = filter.equalsIgnoreCase("ALL") ? false : data.isGuaranteed(filter);
+        int total = filter.equalsIgnoreCase("ALL") ? data.getTotalPulls() : data.getBannerPulls(filter);
+
+        PacketDistributor.sendToPlayer(player, new SyncPullHistoryPayload(
+                filter,
+                filtered,
+                pity5,
+                pity4,
+                guaranteed,
+                total
+        ));
     }
 
     public static void openGachaForPlayer(ServerPlayer player) {
@@ -183,6 +301,7 @@ public class GachaNet {
             String previewItem = (featured != null) ? featured.getItemId() : b.getFeaturedPreviewItem();
             String featuredName = (featured != null && featured.getCustomName() != null) ? featured.getCustomName() : null;
             String featuredSnbt = (featured != null) ? featured.getSnbt() : null;
+            int pity = data.getPity5Star(b.getId());
 
             clientBanners.add(new SyncBannerDataPayload.ClientBannerInfo(
                     b.getId(),
@@ -194,17 +313,39 @@ public class GachaNet {
                     previewItem,
                     featuredName,
                     featuredSnbt,
-                    b.getItems().size()
+                    b.getBackgroundImage(),
+                    b.getItems().size(),
+                    pity
             ));
         }
 
-        int charPity = data.getPity5Star(GachaBanner.BannerType.FEATURED_RESONATOR);
-        int weapPity = data.getPity5Star(GachaBanner.BannerType.FEATURED_WEAPON);
-        int stdPity = data.getPity5Star(GachaBanner.BannerType.STANDARD);
+        int charPity = data.getPity5Star("featured_character");
+        int weapPity = data.getPity5Star("featured_weapon");
+        int stdPity = data.getPity5Star("standard_convene");
         int corals = data.getAfterglowCorals();
-        boolean isGuaranteed = data.isCharacterGuaranteedFeatured();
+        boolean isGuaranteed = data.isGuaranteed("featured_character");
+        int mailboxCount = data.getMailboxCount();
 
-        PacketDistributor.sendToPlayer(player, new SyncBannerDataPayload(clientBanners, charPity, weapPity, stdPity, corals, isGuaranteed));
+        PacketDistributor.sendToPlayer(player, new SyncBannerDataPayload(clientBanners, charPity, weapPity, stdPity, corals, isGuaranteed, mailboxCount));
+    }
+
+    public static void sendMailboxToPlayer(ServerPlayer player) {
+        PlayerGachaData data = GachaManager.INSTANCE.getPlayerData(player.getUUID());
+        List<PlayerGachaData.MailboxItem> items = data.getMailbox();
+        List<SyncMailboxPayload.MailboxItemData> list = new ArrayList<>();
+        for (PlayerGachaData.MailboxItem item : items) {
+            list.add(new SyncMailboxPayload.MailboxItemData(
+                    item.getMailId(),
+                    item.getBannerId(),
+                    item.getItemId(),
+                    item.getCount(),
+                    item.getStars(),
+                    item.getCustomName(),
+                    item.getSnbt(),
+                    item.getTimestamp()
+            ));
+        }
+        PacketDistributor.sendToPlayer(player, new SyncMailboxPayload(list));
     }
 
     public static void sendItemPoolToPlayer(ServerPlayer player, String bannerId) {
@@ -219,5 +360,12 @@ public class GachaNet {
             }
             PacketDistributor.sendToPlayer(player, new AdminSyncItemPoolPayload(bannerId, list));
         });
+    }
+
+    public static boolean canAdmin(ServerPlayer player) {
+        if (player == null) return false;
+        if (player.hasPermissions(2) || player.isCreative()) return true;
+        if (player.getServer() != null && player.getServer().isSingleplayerOwner(player.getGameProfile())) return true;
+        return false;
     }
 }

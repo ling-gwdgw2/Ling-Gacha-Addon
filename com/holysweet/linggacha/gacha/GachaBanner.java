@@ -42,9 +42,14 @@ public class GachaBanner {
     private int costPerPull;
     private int tenPullDiscountPercent;
     private String featuredPreviewItem;
+    private String backgroundImage;
     private final List<GachaItemEntry> items = new ArrayList<>();
 
     public GachaBanner(String id, String title, String subtitle, BannerType bannerType, int costPerPull, int tenPullDiscountPercent, String featuredPreviewItem) {
+        this(id, title, subtitle, bannerType, costPerPull, tenPullDiscountPercent, featuredPreviewItem, null);
+    }
+
+    public GachaBanner(String id, String title, String subtitle, BannerType bannerType, int costPerPull, int tenPullDiscountPercent, String featuredPreviewItem, String backgroundImage) {
         this.id = id;
         this.title = title;
         this.subtitle = subtitle;
@@ -52,6 +57,7 @@ public class GachaBanner {
         this.costPerPull = Math.max(1, costPerPull);
         this.tenPullDiscountPercent = Math.max(0, Math.min(100, tenPullDiscountPercent));
         this.featuredPreviewItem = featuredPreviewItem;
+        this.backgroundImage = backgroundImage;
     }
 
     public String getId() {
@@ -113,6 +119,14 @@ public class GachaBanner {
 
     public void setFeaturedPreviewItem(String featuredPreviewItem) {
         this.featuredPreviewItem = featuredPreviewItem;
+    }
+
+    public String getBackgroundImage() {
+        return backgroundImage;
+    }
+
+    public void setBackgroundImage(String backgroundImage) {
+        this.backgroundImage = backgroundImage;
     }
 
     public void addItem(GachaItemEntry entry) {

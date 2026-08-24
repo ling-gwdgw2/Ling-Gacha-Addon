@@ -28,6 +28,7 @@ public class ItemAddEditModal {
     private EditBox nameBox;
     private EditBox countBox;
     private EditBox weightBox;
+    private EditBox focusedEditBox = null;
 
     private GachaRarity selectedRarity;
     private boolean isRateUp;
@@ -94,37 +95,40 @@ public class ItemAddEditModal {
         return stack;
     }
 
-    public void init(int leftPos, int topPos) {
-        int modalW = 260;
-        int modalH = 200;
-        int modalX = leftPos + (360 - modalW) / 2;
-        int modalY = topPos + (230 - modalH) / 2;
+    public void init(int screenWidth, int screenHeight) {
+        int modalW = 280;
+        int modalH = 210;
+        int modalX = (screenWidth - modalW) / 2;
+        int modalY = (screenHeight - modalH) / 2;
 
         int inputX = modalX + 75;
-        int inputW = 170;
+        int inputW = 190;
         int y = modalY + 30;
 
         this.nameBox = new EditBox(Minecraft.getInstance().font, inputX, y, inputW, 14, Component.literal("Custom Name"));
+        this.nameBox.setMaxLength(128);
         String defaultName = previewStack.has(net.minecraft.core.component.DataComponents.CUSTOM_NAME)
                 ? previewStack.getHoverName().getString() : previewStack.getHoverName().getString();
         this.nameBox.setValue(defaultName);
         y += 20;
 
         this.countBox = new EditBox(Minecraft.getInstance().font, inputX, y, 50, 14, Component.literal("Count"));
+        this.countBox.setMaxLength(8);
         this.countBox.setValue(String.valueOf(Math.max(1, previewStack.getCount())));
 
         this.weightBox = new EditBox(Minecraft.getInstance().font, inputX + 110, y, 50, 14, Component.literal("Weight"));
+        this.weightBox.setMaxLength(8);
         this.weightBox.setValue(selectedRarity == GachaRarity.FIVE_STAR ? "10" : (selectedRarity == GachaRarity.FOUR_STAR ? "20" : "50"));
         y += 22;
 
         // Rarity Star Buttons
-        int rBtnW = 50;
-        this.rarity3Btn = Button.builder(Component.literal("§93★ Blue"), b -> setRarity(GachaRarity.THREE_STAR))
+        int rBtnW = 60;
+        this.rarity3Btn = Button.builder(Component.literal(selectedRarity == GachaRarity.THREE_STAR ? "§9[v] 3-Star" : "§73-Star"), b -> setRarity(GachaRarity.THREE_STAR))
                 .bounds(modalX + 75, y, rBtnW, 16).build();
-        this.rarity4Btn = Button.builder(Component.literal("§54★ Purple"), b -> setRarity(GachaRarity.FOUR_STAR))
-                .bounds(modalX + 130, y, rBtnW, 16).build();
-        this.rarity5Btn = Button.builder(Component.literal("§65★ Gold"), b -> setRarity(GachaRarity.FIVE_STAR))
-                .bounds(modalX + 185, y, rBtnW, 16).build();
+        this.rarity4Btn = Button.builder(Component.literal(selectedRarity == GachaRarity.FOUR_STAR ? "§5[v] 4-Star" : "§74-Star"), b -> setRarity(GachaRarity.FOUR_STAR))
+                .bounds(modalX + 138, y, rBtnW, 16).build();
+        this.rarity5Btn = Button.builder(Component.literal(selectedRarity == GachaRarity.FIVE_STAR ? "§6[v] 5-Star" : "§75-Star"), b -> setRarity(GachaRarity.FIVE_STAR))
+                .bounds(modalX + 201, y, rBtnW, 16).build();
         y += 22;
 
         this.rateUpBtn = Button.builder(Component.literal("Rate-Up: " + (isRateUp ? "§aYES" : "§cNO")), b -> toggleRateUp())
@@ -132,10 +136,23 @@ public class ItemAddEditModal {
         y += 24;
 
         this.saveBtn = Button.builder(Component.literal("§aSave Item"), b -> save())
-                .bounds(modalX + 25, y, 100, 18).build();
+                .bounds(modalX + 25, y, 105, 18).build();
 
-        this.cancelBtn = Button.builder(Component.literal("Cancel"), b -> parent.closeModal())
-                .bounds(modalX + 135, y, 100, 18).build();
+        this.cancelBtn = Button.builder(Component.literal("Cancel"), b -> parent.closeItemAddEditModal())
+                .bounds(modalX + 150, y, 105, 18).build();
+
+        setFocusedEditBox(nameBox);
+    }
+
+    private boolean isMouseOver(EditBox box, double mouseX, double mouseY) {
+        return box != null && mouseX >= box.getX() && mouseX <= (box.getX() + box.getWidth()) && mouseY >= box.getY() && mouseY <= (box.getY() + box.getHeight());
+    }
+
+    private void setFocusedEditBox(EditBox target) {
+        if (nameBox != null) nameBox.setFocused(nameBox == target);
+        if (countBox != null) countBox.setFocused(countBox == target);
+        if (weightBox != null) weightBox.setFocused(weightBox == target);
+        this.focusedEditBox = target;
     }
 
     private void setRarity(GachaRarity r) {
@@ -143,6 +160,9 @@ public class ItemAddEditModal {
         if (weightBox != null) {
             weightBox.setValue(r == GachaRarity.FIVE_STAR ? "10" : (r == GachaRarity.FOUR_STAR ? "20" : "50"));
         }
+        if (rarity3Btn != null) rarity3Btn.setMessage(Component.literal(selectedRarity == GachaRarity.THREE_STAR ? "§9[v] 3-Star" : "§73-Star"));
+        if (rarity4Btn != null) rarity4Btn.setMessage(Component.literal(selectedRarity == GachaRarity.FOUR_STAR ? "§5[v] 4-Star" : "§74-Star"));
+        if (rarity5Btn != null) rarity5Btn.setMessage(Component.literal(selectedRarity == GachaRarity.FIVE_STAR ? "§6[v] 5-Star" : "§75-Star"));
     }
 
     private void toggleRateUp() {
@@ -172,17 +192,20 @@ public class ItemAddEditModal {
                     customName.isEmpty() ? null : customName, weight, isRateUp, initialSnbt
             ));
         }
-        parent.closeModal();
+        parent.closeItemAddEditModal();
     }
 
-    public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick, int leftPos, int topPos) {
-        int modalW = 260;
-        int modalH = 200;
-        int modalX = leftPos + (360 - modalW) / 2;
-        int modalY = topPos + (230 - modalH) / 2;
+    public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick, int screenWidth, int screenHeight) {
+        int modalW = 280;
+        int modalH = 210;
+        int modalX = (screenWidth - modalW) / 2;
+        int modalY = (screenHeight - modalH) / 2;
 
         guiGraphics.pose().pushPose();
         guiGraphics.pose().translate(0, 0, 400.0F);
+
+        // Full Screen Dark Dim Backdrop
+        guiGraphics.fill(0, 0, screenWidth, screenHeight, 0xAA000000);
 
         // Dark Modal Background
         guiGraphics.fill(modalX, modalY, modalX + modalW, modalY + modalH, 0xFF0A0A16);
@@ -190,7 +213,7 @@ public class ItemAddEditModal {
 
         // Header Title
         guiGraphics.fill(modalX + 1, modalY + 1, modalX + modalW - 1, modalY + 20, 0xFF2A1C40);
-        String header = (itemIndex < 0) ? "✦ ADD ITEM TO POOL ✦" : "✦ EDIT ITEM ✦";
+        String header = (itemIndex < 0) ? "ADD ITEM TO POOL" : "EDIT ITEM";
         guiGraphics.drawString(Minecraft.getInstance().font, header, modalX + 10, modalY + 6, 0xFFFFD700, true);
 
         // Item Preview Box
@@ -232,9 +255,17 @@ public class ItemAddEditModal {
     }
 
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        if (nameBox != null && nameBox.mouseClicked(mouseX, mouseY, button)) return true;
-        if (countBox != null && countBox.mouseClicked(mouseX, mouseY, button)) return true;
-        if (weightBox != null && weightBox.mouseClicked(mouseX, mouseY, button)) return true;
+        EditBox clickedBox = null;
+        if (nameBox != null && isMouseOver(nameBox, mouseX, mouseY)) clickedBox = nameBox;
+        else if (countBox != null && isMouseOver(countBox, mouseX, mouseY)) clickedBox = countBox;
+        else if (weightBox != null && isMouseOver(weightBox, mouseX, mouseY)) clickedBox = weightBox;
+
+        if (clickedBox != null) {
+            setFocusedEditBox(clickedBox);
+            clickedBox.mouseClicked(mouseX, mouseY, button);
+            return true;
+        }
+
         if (rarity3Btn != null && rarity3Btn.mouseClicked(mouseX, mouseY, button)) return true;
         if (rarity4Btn != null && rarity4Btn.mouseClicked(mouseX, mouseY, button)) return true;
         if (rarity5Btn != null && rarity5Btn.mouseClicked(mouseX, mouseY, button)) return true;
@@ -246,19 +277,19 @@ public class ItemAddEditModal {
 
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
         if (keyCode == 256) { // ESC key
-            parent.closeModal();
+            parent.closeItemAddEditModal();
             return true;
         }
-        if (nameBox != null && nameBox.keyPressed(keyCode, scanCode, modifiers)) return true;
-        if (countBox != null && countBox.keyPressed(keyCode, scanCode, modifiers)) return true;
-        if (weightBox != null && weightBox.keyPressed(keyCode, scanCode, modifiers)) return true;
+        if (focusedEditBox != null) {
+            if (focusedEditBox.keyPressed(keyCode, scanCode, modifiers)) return true;
+        }
         return false;
     }
 
     public boolean charTyped(char codePoint, int modifiers) {
-        if (nameBox != null && nameBox.charTyped(codePoint, modifiers)) return true;
-        if (countBox != null && countBox.charTyped(codePoint, modifiers)) return true;
-        if (weightBox != null && weightBox.charTyped(codePoint, modifiers)) return true;
+        if (focusedEditBox != null) {
+            if (focusedEditBox.charTyped(codePoint, modifiers)) return true;
+        }
         return false;
     }
 }

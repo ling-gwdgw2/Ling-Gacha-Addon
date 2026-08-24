@@ -27,7 +27,10 @@ public class GachaCommands {
                 .requires(s -> s.hasPermission(2))
                 .executes(ctx -> {
                     GachaManager.INSTANCE.loadBanners();
-                    ctx.getSource().sendSuccess(() -> Component.literal("§a[Ling Gacha] Banners reloaded from config/ling_gacha/banners.json!"), true);
+                    if (ctx.getSource().getServer() != null) {
+                        GachaManager.INSTANCE.syncAllOnlinePlayers(ctx.getSource().getServer());
+                    }
+                    ctx.getSource().sendSuccess(() -> Component.literal("§a[Ling Gacha] Banners reloaded & synced to all online players!"), true);
                     return 1;
                 }));
 
@@ -47,7 +50,10 @@ public class GachaCommands {
                 .requires(s -> s.hasPermission(2))
                 .executes(ctx -> {
                     GachaManager.INSTANCE.loadBanners();
-                    ctx.getSource().sendSuccess(() -> Component.literal("§a[Ling Gacha] Banners reloaded from config/ling_gacha/banners.json!"), true);
+                    if (ctx.getSource().getServer() != null) {
+                        GachaManager.INSTANCE.syncAllOnlinePlayers(ctx.getSource().getServer());
+                    }
+                    ctx.getSource().sendSuccess(() -> Component.literal("§a[Ling Gacha] Banners reloaded & synced to all online players!"), true);
                     return 1;
                 }));
 
