@@ -1,41 +1,62 @@
-# 🌊 Ling Gacha Addon (Wuthering Waves Convene System)
+# Ling Gacha Addon (Convene System)
 
-**Ling Gacha Addon** เป็นม็อดส่วนเสริมอย่างเป็นทางการสำหรับ **ling_q_shop** (Minecraft 1.21.1 NeoForge) ที่ยกเอาระบบสุ่มกู่ก้อง **(Convene / 唤取)** จากเกม **Wuthering Waves** มาไว้ในโลก Minecraft อย่างเต็มรูปแบบ!
-
----
-
-## 🌟 ฟีเจอร์หลัก (Key Features)
-
-### 1. 🎴 ระบบตู้สุ่ม 4 รูปแบบ (Banners)
-- **✦ Featured Resonator (ตู้ตัวละครลิมิเต็ด)**:
-  - มีระบบ **หลุดเรท 50/50** (หากหลุดเรท ครั้งต่อไปการันตีได้ของ 5★ หน้าตู้ 100%)
-- **✦ Featured Weapon (ตู้อาวุธลิมิเต็ด)**:
-  - **การันตี 100%** เมื่อออก 5★ จะได้อาวุธหน้าตู้ทันที ไม่มีการหลุดเรท!
-- **✦ Novice Convene (ตู้ผู้เล่นใหม่)**:
-  - ลดราคา 20% (สุ่ม 10 ครั้งใช้ Primogems เท่ากับ 8 ครั้ง) และการันตี 5★ ภายใน 50 โรลแรก
-- **✦ Standard Convene (ตู้ถาวร)**:
-  - สุ่มรวมไอเทมระดับ 5★, 4★, 3★ ทั่วไป
-
-### 2. 📊 ระบบเรท & การันตี (Pity System)
-- **5★ (Legendary)**: เรทพื้นฐาน `0.8%` / **Soft Pity** เริ่มต้นที่โรล `65-79` (อัตราพุ่งสูงขึ้น) / **Hard Pity** การันตีที่โรล `80`
-- **4★ (Epic)**: เรทพื้นฐาน `6.0%` / การันตีอย่างน้อย 1 ชิ้นทุกๆ `10` โรล
-- **3★ (Supplies)**: เรทพื้นฐาน `93.2%`
-- **Afterglow Coral Cashback**: สุ่มได้ 5★ รับ 15 Corals / 4★ รับ 3 Corals / 3★ รับ 1 Coral
-
-### 3. 🎵 แอนิเมชันคลื่นเสียง & UI สไตล์ Sci-Fi (Soundwave UI)
-- **Frequency Wave Burst**: ปล่อยคลื่นสเปกตรัมความถี่เสียงก่อนเปิดการ์ด:
-  - 🟡 **คลื่นเสียงสีทอง** = ออกของ 5★ (พร้อมเสียงเฉลิมฉลองและประกาศชื่อทั่วเซิร์ฟเวอร์!)
-  - 🟣 **คลื่นเสียงสีม่วง** = ออกของ 4★
-  - 🔵 **คลื่นเสียงสีฟ้า** = ออกของ 3★
-- **10-Pull Card Reveal**: เปิดการ์ดเรียง 10 ใบพร้อมเอฟเฟกต์กรอบแสงตามระดับดาว
+Ling Gacha Addon is an expansion mod for ling_q_shop (Minecraft 1.21.1 NeoForge) that brings a full-fledged gacha convene system inspired by Wuthering Waves into Minecraft.
 
 ---
 
-## 🎮 วิธีการใช้งานในเกม
+## Key Features
 
-1. **เปิดหน้าต่างสุ่มกาชา**:
-   - พิมพ์คำสั่ง: `/convene` หรือ `/gacha`
-   - หรือถือไอเทม **Convene Tide Token** (`ling_gacha:convene_tide`) แล้วคลิกขวา
-2. **การตั้งค่าไอเทมในตู้**:
-   - ไฟล์ Config อยู่ที่ `config/ling_gacha/banners.json` สามารถปรับแต่งไอเทม, อัตราดรอป, ราคา และชื่อไอเทมได้ตามต้องการ
-   - คำสั่งรีโหลดคอนฟิก: `/convene reload` (สำหรับ Admin)
+### 1. Banner Types
+- **Featured Resonator (Character Banner)**:
+  - 50/50 Rule: 50% chance for the featured 5-Star item. If lost, the next 5-Star is 100% guaranteed to be the featured rate-up item.
+- **Featured Weapon (Weapon Banner)**:
+  - 100% Guaranteed: When pulling a 5-Star item, it is always the featured rate-up weapon without any off-banner loss.
+- **Novice Convene (Beginner Banner)**:
+  - 20% discount on 10-pulls (costs 8 pulls worth of Primogems) with a guaranteed 5-Star within the first 50 pulls.
+- **Standard Convene (Permanent Banner)**:
+  - Standard pool containing 5-Star, 4-Star, and 3-Star rewards.
+
+### 2. Rates and Pity Mechanics
+- **5-Star (Legendary)**: Base rate of 0.8%. Soft pity starts at pulls 65-79 (rate scales up sharply). Hard pity guarantees a 5-Star at pull 80.
+- **4-Star (Epic)**: Base rate of 6.0%. Guaranteed at least one 4-Star item every 10 pulls.
+- **3-Star (Supplies)**: Base rate of 93.2%.
+- **Afterglow Coral Cashback**: Pulling items awards Afterglow Corals (15 for 5-Star, 3 for 4-Star, 1 for 3-Star).
+- **Per-Banner Isolated Pity**: Each banner tracks its own independent 5-Star pity, 4-Star pity, guaranteed state, and pull count.
+
+### 3. Gacha Mailbox / Reward Storage
+- **Inventory Overflow Protection**: When pulling gacha, won items are automatically stored in the player's private Gacha Mailbox.
+- **Selective & Bulk Claim**: Players can inspect rewards, view pull dates, and claim items individually or using "Claim All".
+- **Capacity Safe**: Items will never drop on the ground or be lost if the player's inventory is full.
+
+### 4. Custom Media & Animation Engine
+- **Supported Formats**: Supports animated GIF (.gif), sprite frame sequence (.afma), PNG (.png), and JPEG (.jpg).
+- **Banner Backgrounds**: Place background files in `config/ling_gacha/backgrounds/` or use resource locations (e.g. `ling_gacha:textures/gui/banners/featured_character.png`).
+- **Custom Pull Animations**: Place pull animation files in `config/ling_gacha/animations/`:
+  - `pull_5star.gif` / `pull_5star.afma` - Plays when pulling a 5-Star item.
+  - `pull_4star.gif` / `pull_4star.afma` - Plays when pulling a 4-Star item.
+  - `pull_3star.gif` / `pull_3star.afma` - Plays when pulling a 3-Star item.
+  - `pull.gif` / `pull.afma` - Default pull animation.
+  - Built-in frequency soundwave spectrogram fallback if no custom animation files are present.
+
+### 5. In-Game Admin Editor
+- **Permission**: Requires OP Level 2, Creative Mode, or Singleplayer World Host.
+- **Edit Mode**: Toggle `[Edit Mode]` directly inside the Gacha UI to:
+  - Create new banners and customize titles, subtitles, pull costs, discounts, and backgrounds.
+  - Open `[Pool]` to edit item weights, custom display names, rate-up status, and rarity tiers.
+  - Click `[+ Add Hand Item]` to immediately register the held item in hand with full SNBT data into the banner pool.
+
+---
+
+## How to Use
+
+### 1. Opening the Gacha Screen
+- Command: `/convene` or `/gacha`
+- ESC Pause Menu: Click the clover icon button on the right side of the Game Menu.
+- Convene Tide Item: Right-click the `ling_gacha:convene_tide` token item.
+
+### 2. Configuration & Data Storage
+- **Banner Configuration**: `config/ling_gacha/banners.json`
+  - Stores all banner definitions, item pools, costs, discounts, and background textures.
+- **Player Data**: `config/ling_gacha/playerdata/<Player_UUID>.json`
+  - Secure server-side storage for player pity counts, pull history, Afterglow Corals, and Mailbox items.
+- **Reload Command**: `/convene reload` or `/gacha reload` (Admin only).
