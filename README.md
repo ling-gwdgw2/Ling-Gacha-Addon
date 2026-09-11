@@ -47,6 +47,202 @@ Ling Gacha Addon is an expansion mod for ling_q_shop (Minecraft 1.21.1 NeoForge)
 
 ---
 
+## Technical Architecture & System Specification
+
+### 1. Architecture Overview
+Ling Gacha Addon utilizes a strict **Client-Server Authoritative Architecture** built on the NeoForge 1.21.1 network pipeline. All mathematical calculations (RNG, pity tracking, currency deduction, mailbox state mutations) execute solely on the dedicated logical server, while the client acts as a high-fidelity visual and audio rendering frontend.
+
+```
+[Client GUI / Input Layer]
+         │
+         ▼ (Custom CustomPacketPayload via PacketDistributor)
+[Network Serialization Layer (GachaNet)]
+         │
+         ▼ (Server Execution Thread)
+[Economy Validation (CoinsService / FTB Teams)]
+         │
+         ▼ (Deduction Succeeded)
+[Gacha Core Engine (GachaManager)]
+  ├── Pity & 50/50 State Machine
+  ├── Weighted Cumulative RNG Tier Selector
+  └── Item Pool Selector (with SNBT Restoration)
+         │
+         ▼ (State Mutation)
+[Persistence Layer (PlayerGachaData JSON Engine)]
+         │
+         ▼ (Network Response)
+[Client Screen Pipeline (GachaRevealScreen / AnimationManager)]
+  ├── OpenGL DynamicTexture Frame Uploads
+  └── 3D Item Renderer & Particle Matrix
+```
+
+---
+
+### 2. Network Protocol & Payload Matrix
+
+All communication between client and server is handled via typed `CustomPacketPayload` records registered in `GachaNet.java`:
+
+| Payload ID | Direction | Purpose & Data Fields |
+| :--- | :--- | :--- |
+| `request_open_gacha` | Client -> Server | Requests synchronized banner lists, active pricing, and current currency balance. |
+| `sync_banner_data` | Server -> Client | Sends all active banners, item pools, costs, discounts, and the player's mailbox pending count. |
+| `convene_pull` | Client -> Server | Dispatches convene request (`bannerId`, `pullCount`: 1 or 10). |
+| `convene_result` | Server -> Client | Transmits roll results (`prizes`, `highestStars`, `coralsAwarded`, `currencyRemaining`). |
+| `request_pull_history` | Client -> Server | Requests historical pull records for a specific banner ID or `ALL`. |
+| `sync_pull_history` | Server -> Client | Returns paginated pull records (`bannerId`, `itemId`, `stars`, `pity`, `timestamp`). |
+| `request_mailbox` | Client -> Server | Queries the player's pending reward mailbox list. |
+| `sync_mailbox` | Server -> Client | Synchronizes mailbox item list with full metadata, custom names, and SNBT. |
+| `claim_mailbox_item` | Client -> Server | Requests claim of a specific `mailId` or `ALL` into player inventory. |
+| `admin_update_banner` | Client -> Server | Administrative banner configuration update (Title, Cost, Discount, Background). |
+| `admin_delete_banner` | Client -> Server | Administrative banner removal. |
+| `admin_add_gacha_item` | Client -> Server | Adds a new item entry to a banner pool with weights and SNBT. |
+| `admin_update_gacha_item`| Client -> Server | Updates an existing item entry's rarity, weight, name, or count. |
+| `admin_remove_gacha_item`| Client -> Server | Deletes an item entry from a banner pool. |
+
+---
+
+### 3. Probability & Pity Algorithm Specification
+
+The convene RNG system implements a deterministic, multi-stage tier resolution algorithm in `GachaManager.java`:
+
+#### Tier Determination Pipeline
+1. **5-Star Pity Check**:
+   - Base 5-Star Probability: $P_5 = 0.008$ ($0.8\%$).
+   - Current 5-Star Pity counter: $C_5 \in [0, 80]$.
+   - Soft Pity Range: $C_5 \ge 65$. Probability scales linearly:
+     $$P_5(C_5) = 0.008 + (C_5 - 64) \times 0.0585$$
+   - Hard Pity: When $C_5 = 80$, $P_5(80) = 1.0$ ($100\%$).
+2. **4-Star Pity Check** (if 5-Star not hit):
+   - Base 4-Star Probability: $P_4 = 0.060$ ($6.0\%$).
+   - Current 4-Star Pity counter: $C_4 \in [0, 10]$.
+   - Hard Pity: When $C_4 = 10$, $P_4(10) = 1.0$ ($100\%$).
+3. **3-Star Fallback**:
+   - If neither 5-Star nor 4-Star triggers, 3-Star supplies pool is selected ($P_3 \approx 93.2\%$).
+
+#### 50/50 & Guarantee State Machine
+- For `FEATURED_RESONATOR` banners:
+  - If a 5-Star is rolled and `bannerGuaranteed == false`, roll random boolean ($50\%$ chance).
+  - If won: Item is chosen from rate-up 5-Star pool; `bannerGuaranteed` remains `false`.
+  - If lost: Item is chosen from standard 5-Star pool; `bannerGuaranteed` becomes `true`.
+  - If `bannerGuaranteed == true`: Next 5-Star is 100% forced rate-up; state resets to `false`.
+- For `FEATURED_WEAPON` banners:
+  - 100% Rate-up guarantee; no 50/50 loss mechanism.
+
+#### Weighted Item Selection
+Once a tier is selected, items in that tier are chosen using cumulative weight sampling:
+$$P(item_i) = \frac{W_i}{\sum_{j=1}^{N} W_j}$$
+Where $W_i$ is the configured weight integer of item $i$.
+
+---
+
+### 4. Client Animation & Media Rendering Pipeline
+
+The client features a native media engine designed to bypass standard Minecraft texture atlas restrictions:
+
+- **Native GIF Streaming Decoder (`GifDecoder.java`)**:
+  - Direct binary stream parsing of GIF89a specifications (Logical Screen Descriptor, Global/Local Color Tables, Graphics Control Extensions, and LZW image data).
+  - Extracts per-frame disposal methods, transparency indices, and millisecond frame delays.
+- **Dynamic OpenGL Texture Engine (`AnimatedTexture.java`)**:
+  - Converts unpacked `BufferedImage` frames into `NativeImage` byte buffers.
+  - Dynamically binds and registers textures into Minecraft's `TextureManager` as runtime `DynamicTexture` objects.
+  - Automatically unloads and releases OpenGL texture memory on modal close to eliminate VRAM leakage.
+- **AFMA Frame Sequence Descriptor (`AfmaAnimation.java`)**:
+  - Parses JSON descriptor files containing custom frame rates, loop flags, and discrete sprite frame sequences.
+- **Real-Time 3D Showcase Matrix**:
+  - Renders rotating 3D preview item models with bobbing sinusoidal oscillations:
+    $$Y_{offset} = \sin(t \times 2.2) \times 3.5\text{ px}$$
+    $$\theta_{rotation} = (t \times 45.0^\circ) \bmod 360.0^\circ$$
+  - Rendered via `ItemRenderer.renderStatic()` with `ItemDisplayContext.FIXED` under full ambient illumination (`15728880`).
+
+---
+
+### 5. Economy & Currency Integration
+
+The mod connects directly to `ling_q_shop`'s balance manager through `CoinsService.java`:
+- **Team Balance Awareness**:
+  - Queries `FTB Teams` API if present. If a player belongs to a team, the team's shared account is checked and debited.
+  - If FTB Teams is absent or the player is solo, their individual player account is charged.
+- **Atomic Balance Deduction**:
+  - Pre-flight balance checks prevent partial pulls. Currency is deducted atomically before any RNG calculation or mailbox insertion occurs.
+
+---
+
+### 6. Storage & Serialization Schema
+
+#### Banner Definitions (`config/ling_gacha/banners.json`)
+```json
+[
+  {
+    "id": "featured_character",
+    "title": "Vermillion Flight",
+    "subtitle": "Featured 5-Star Resonator & Gear",
+    "type": "FEATURED_RESONATOR",
+    "cost": 160,
+    "discountPercent": 0,
+    "previewItem": "minecraft:netherite_sword",
+    "backgroundImage": "ling_gacha:textures/gui/banners/featured_character.png",
+    "items": [
+      {
+        "itemId": "minecraft:netherite_sword",
+        "count": 1,
+        "stars": 5,
+        "customName": "Blazing Sunblade",
+        "weight": 10,
+        "isRateUp": true,
+        "snbt": "{display:{Lore:['\"A legendary blade\"']}}"
+      }
+    ]
+  }
+]
+```
+
+#### Player Data Schema (`config/ling_gacha/playerdata/<UUID>.json`)
+```json
+{
+  "total": 120,
+  "corals": 24,
+  "bannerPity5": {
+    "featured_character": 42,
+    "featured_weapon": 10
+  },
+  "bannerPity4": {
+    "featured_character": 4,
+    "featured_weapon": 8
+  },
+  "bannerGuaranteed": {
+    "featured_character": true
+  },
+  "bannerPulls": {
+    "featured_character": 90,
+    "featured_weapon": 30
+  },
+  "history": [
+    {
+      "banner": "featured_character",
+      "item": "minecraft:netherite_sword",
+      "name": "Blazing Sunblade",
+      "stars": 5,
+      "time": 1724458510000,
+      "pity": 72
+    }
+  ],
+  "mailbox": [
+    {
+      "mailId": "c4b1d6f2-3e5a-4b9d-a8e1-9c8f1d2e3a4b",
+      "banner": "featured_character",
+      "item": "minecraft:netherite_sword",
+      "count": 1,
+      "stars": 5,
+      "name": "Blazing Sunblade",
+      "snbt": null,
+      "time": 1724458510000
+    }
+  ]
+}
+```
+
+---
+
 ## How to Use
 
 ### 1. Opening the Gacha Screen
