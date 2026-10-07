@@ -89,6 +89,17 @@ public class AnimatedTexture {
         return frames;
     }
 
+    public void release() {
+        for (Frame f : frames) {
+            if (f.getLocation() != null) {
+                try {
+                    Minecraft.getInstance().getTextureManager().release(f.getLocation());
+                } catch (Exception ignored) {}
+            }
+        }
+        frames.clear();
+    }
+
     public static ResourceLocation uploadFrame(String name, BufferedImage img) {
         int w = img.getWidth();
         int h = img.getHeight();

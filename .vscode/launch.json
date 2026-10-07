@@ -1,0 +1,12 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Build Mod (compile_gacha.py)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/compile_gacha.py",
+            "console": "integratedTerminal"
+        }
+    ]
+}

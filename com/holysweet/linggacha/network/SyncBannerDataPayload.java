@@ -17,6 +17,40 @@ public record SyncBannerDataPayload(List<ClientBannerInfo> banners, int charPity
             SyncBannerDataPayload::new
     );
 
+    public record BannerItemData(
+            String itemId,
+            int count,
+            int stars,
+            String customName,
+            int weight,
+            boolean isRateUp,
+            String snbt
+    ) {
+        public static BannerItemData read(FriendlyByteBuf buf) {
+            return new BannerItemData(
+                    buf.readUtf(),
+                    buf.readVarInt(),
+                    buf.readVarInt(),
+                    buf.readBoolean() ? buf.readUtf() : null,
+                    buf.readVarInt(),
+                    buf.readBoolean(),
+                    buf.readBoolean() ? buf.readUtf() : null
+            );
+        }
+
+        public void write(FriendlyByteBuf buf) {
+            buf.writeUtf(itemId);
+            buf.writeVarInt(count);
+            buf.writeVarInt(stars);
+            buf.writeBoolean(customName != null);
+            if (customName != null) buf.writeUtf(customName);
+            buf.writeVarInt(weight);
+            buf.writeBoolean(isRateUp);
+            buf.writeBoolean(snbt != null);
+            if (snbt != null) buf.writeUtf(snbt);
+        }
+    }
+
     public record ClientBannerInfo(
             String id,
             String title,
@@ -29,7 +63,8 @@ public record SyncBannerDataPayload(List<ClientBannerInfo> banners, int charPity
             String featuredSnbt,
             String backgroundImage,
             int totalItems,
-            int currentPity5
+            int currentPity5,
+            List<BannerItemData> items
     ) {
         public static ClientBannerInfo read(FriendlyByteBuf buf) {
             return new ClientBannerInfo(
@@ -44,7 +79,8 @@ public record SyncBannerDataPayload(List<ClientBannerInfo> banners, int charPity
                     buf.readBoolean() ? buf.readUtf() : null,
                     buf.readBoolean() ? buf.readUtf() : null,
                     buf.readVarInt(),
-                    buf.readVarInt()
+                    buf.readVarInt(),
+                    buf.readList(BannerItemData::read)
             );
         }
 
@@ -64,6 +100,7 @@ public record SyncBannerDataPayload(List<ClientBannerInfo> banners, int charPity
             if (backgroundImage != null) buf.writeUtf(backgroundImage);
             buf.writeVarInt(totalItems);
             buf.writeVarInt(currentPity5);
+            buf.writeCollection(items, (b, item) -> item.write(b));
         }
     }
 

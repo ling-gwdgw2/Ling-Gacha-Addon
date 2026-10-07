@@ -12,7 +12,9 @@ import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
+import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.server.ServerStartingEvent;
+import net.neoforged.neoforge.event.server.ServerStoppingEvent;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 import net.neoforged.neoforge.registries.DeferredHolder;
 import net.neoforged.neoforge.registries.DeferredRegister;
@@ -38,6 +40,8 @@ public class LingGachaMod {
 
         NeoForge.EVENT_BUS.addListener(this::registerCommands);
         NeoForge.EVENT_BUS.addListener(this::onServerStarting);
+        NeoForge.EVENT_BUS.addListener(this::onServerStopping);
+        NeoForge.EVENT_BUS.addListener(this::onPlayerLoggedOut);
     }
 
     private void registerPayloads(RegisterPayloadHandlersEvent event) {
@@ -51,5 +55,17 @@ public class LingGachaMod {
     private void onServerStarting(ServerStartingEvent event) {
         GachaManager.INSTANCE.loadBanners();
         LOGGER.info("[Ling Gacha] Wuthering Waves Convene pools successfully loaded.");
+    }
+
+    private void onPlayerLoggedOut(PlayerEvent.PlayerLoggedOutEvent event) {
+        if (event.getEntity() != null) {
+            GachaManager.INSTANCE.unloadPlayerData(event.getEntity().getUUID());
+        }
+    }
+
+    private void onServerStopping(ServerStoppingEvent event) {
+        GachaManager.INSTANCE.saveAllPlayerData();
+        GachaManager.INSTANCE.saveBanners();
+        LOGGER.info("[Ling Gacha] Saved all player data and banner configurations on server shutdown.");
     }
 }

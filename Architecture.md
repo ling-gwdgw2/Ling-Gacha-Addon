@@ -85,7 +85,7 @@ Ling Gacha Addon adopts a strict **Server-Authoritative, Thin-Client Pipeline**.
 
 ### 2.4 Client UI & Media Rendering Subsystem
 - `com.holysweet.linggacha.client.screen.GachaScreen`: Primary full-screen gacha hub rendering live 3D preview item showcases, banner selection sidebars, and admin controls.
-- `com.holysweet.linggacha.client.screen.GachaRevealScreen`: Cinematic pull result reveal screen featuring soundwave waveforms, 1x / 10x cards, and custom `.gif`/`.afma` animation playback.
+- `com.holysweet.linggacha.client.screen.GachaRevealScreen`: Cinematic pull result reveal screen featuring 3 distinct stages: 1) Procedural meteor/resonance cutscene with rarity-colored comet streaks & shockwaves, 2) Interactive sequential card reveal with floating 3D models and sound fanfares, and 3) 10-Card showcase summary grid with radiant rarity auras, tooltips, and repeat-pull actions.
 - `com.holysweet.linggacha.client.screen.BannerSettingsModal`: In-game admin modal for editing banner pricing, metadata, and background asset references.
 - `com.holysweet.linggacha.client.screen.ItemPoolEditModal`: Admin modal for listing, adding, and removing pool items.
 - `com.holysweet.linggacha.client.screen.ItemAddEditModal`: Admin modal for editing weights, star ratings, and NBT attributes of items.

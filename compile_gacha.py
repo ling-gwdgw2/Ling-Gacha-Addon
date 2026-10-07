@@ -21,13 +21,23 @@ if os.path.exists(out_jar):
 if os.path.exists(root_jar):
     os.remove(root_jar)
 
-# 1. Collect CP with valid zipfile check
+# 1. Collect CP with valid zipfile check and Java 21 class version constraint
 def is_valid_jar(p):
     if not p.endswith(".jar"): return False
     try:
         if os.path.getsize(p) < 100: return False
         with zipfile.ZipFile(p, 'r') as z:
-            return z.testzip() is None
+            if z.testzip() is not None:
+                return False
+            for name in z.namelist():
+                if name.endswith('.class'):
+                    data = z.read(name)[:8]
+                    if len(data) >= 8 and data[:4] == b'\xca\xfe\xba\xbe':
+                        major = int.from_bytes(data[6:8], 'big')
+                        if major > 65:  # Exclude classes newer than Java 21 (major version 65)
+                            return False
+                    break
+            return True
     except Exception:
         return False
 
@@ -51,6 +61,8 @@ for qj in qshop_jars:
 
 # Priority 1.21.1 NeoForge and vanilla client jars
 priority_jars = [
+    os.path.join(curseforge_libs, "net", "neoforged", "fancymodloader", "loader", "4.0.44", "loader-4.0.44.jar"),
+    os.path.join(curseforge_libs, "net", "neoforged", "fancymodloader", "earlydisplay", "4.0.44", "earlydisplay-4.0.44.jar"),
     os.path.join(curseforge_libs, "net", "neoforged", "neoforge", "21.1.244", "neoforge-21.1.244-client.jar"),
     os.path.join(curseforge_libs, "net", "neoforged", "neoforge", "21.1.244", "neoforge-21.1.244-universal.jar"),
     os.path.join(curseforge_libs, "net", "minecraft", "client", "1.21.1-20240808.144430", "client-1.21.1-20240808.144430-extra.jar"),
@@ -62,11 +74,15 @@ for pj in priority_jars:
     if os.path.exists(pj) and is_valid_jar(pj):
         cp_jars.append(pj.replace("\\", "/"))
 
-# Scan libraries excluding old forge jars
+# Scan libraries excluding old forge jars and incompatible versions
 if os.path.exists(curseforge_libs):
     for root, _, files in os.walk(curseforge_libs):
+        root_lower = root.lower()
+        if "minecraftforge" in root_lower: continue
+        if "fancymodloader" in root_lower and ("11." in root_lower or "12." in root_lower): continue
+        if "neoforge" in root_lower and ("26." in root_lower or "22." in root_lower): continue
         for f in files:
-            if f.endswith(".jar") and "minecraftforge" not in root.lower():
+            if f.endswith(".jar"):
                 full = os.path.join(root, f)
                 if is_valid_jar(full) and full.replace("\\", "/") not in cp_jars:
                     cp_jars.append(full.replace("\\", "/"))

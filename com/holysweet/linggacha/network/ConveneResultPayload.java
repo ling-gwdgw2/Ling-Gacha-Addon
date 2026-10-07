@@ -17,9 +17,14 @@ public record ConveneResultPayload(String bannerId, List<PrizeData> prizes, int 
             ConveneResultPayload::new
     );
 
-    public record PrizeData(String itemId, int count, int stars, String name) {
+    public record PrizeData(String itemId, int count, int stars, String name, String snbt) {
         public static PrizeData read(FriendlyByteBuf buf) {
-            return new PrizeData(buf.readUtf(), buf.readVarInt(), buf.readVarInt(), buf.readUtf());
+            String itemId = buf.readUtf();
+            int count = buf.readVarInt();
+            int stars = buf.readVarInt();
+            String name = buf.readUtf();
+            String snbt = buf.readUtf();
+            return new PrizeData(itemId, count, stars, name, snbt);
         }
 
         public void write(FriendlyByteBuf buf) {
@@ -27,6 +32,7 @@ public record ConveneResultPayload(String bannerId, List<PrizeData> prizes, int 
             buf.writeVarInt(count);
             buf.writeVarInt(stars);
             buf.writeUtf(name != null ? name : "");
+            buf.writeUtf(snbt != null ? snbt : "");
         }
     }
 

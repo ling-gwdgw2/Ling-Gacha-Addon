@@ -5,13 +5,19 @@ import com.google.gson.GsonBuilder;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 
+import com.mojang.logging.LogUtils;
+import org.slf4j.Logger;
+
 import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
+import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
 import java.util.*;
 
 public class PlayerGachaData {
 
+    private static final Logger LOGGER = LogUtils.getLogger();
     private final UUID playerUuid;
 
     // Independent Pity & Stats per Banner ID (Lowercase key)
@@ -89,8 +95,8 @@ public class PlayerGachaData {
         return playerUuid;
     }
 
-    public List<MailboxItem> getMailbox() {
-        return Collections.unmodifiableList(mailbox);
+    public synchronized List<MailboxItem> getMailbox() {
+        return Collections.unmodifiableList(new ArrayList<>(mailbox));
     }
 
     public synchronized void addMailboxItem(MailboxItem item) {
@@ -102,15 +108,15 @@ public class PlayerGachaData {
         return mailbox.removeIf(m -> m.getMailId().equals(mailId));
     }
 
-    public int getMailboxCount() {
+    public synchronized int getMailboxCount() {
         return mailbox.size();
     }
 
-    public List<PullHistoryRecord> getHistory() {
-        return Collections.unmodifiableList(history);
+    public synchronized List<PullHistoryRecord> getHistory() {
+        return Collections.unmodifiableList(new ArrayList<>(history));
     }
 
-    public void addHistoryRecord(PullHistoryRecord record) {
+    public synchronized void addHistoryRecord(PullHistoryRecord record) {
         history.add(0, record); // Most recent first
         if (history.size() > 500) {
             history.remove(history.size() - 1);
@@ -283,80 +289,90 @@ public class PlayerGachaData {
                         }
                     }
                 }
-            } catch (Exception ignored) {}
+            } catch (Exception e) {
+                LOGGER.error("[Ling Gacha] Failed to load player data for {}", uuid, e);
+            }
         }
         return data;
     }
 
-    public void save() {
+    public synchronized void save() {
+        File dir = new File("config/ling_gacha/playerdata");
+        if (!dir.exists()) dir.mkdirs();
+
+        File file = new File(dir, playerUuid + ".json");
+        File tempFile = new File(dir, playerUuid + ".json.tmp");
+        JsonObject obj = new JsonObject();
+        obj.addProperty("total", totalPulls);
+        obj.addProperty("corals", afterglowCorals);
+
+        // Save Banner Pity Maps
+        JsonObject p5Obj = new JsonObject();
+        for (Map.Entry<String, Integer> e : bannerPity5.entrySet()) {
+            p5Obj.addProperty(e.getKey(), e.getValue());
+        }
+        obj.add("bannerPity5", p5Obj);
+
+        JsonObject p4Obj = new JsonObject();
+        for (Map.Entry<String, Integer> e : bannerPity4.entrySet()) {
+            p4Obj.addProperty(e.getKey(), e.getValue());
+        }
+        obj.add("bannerPity4", p4Obj);
+
+        JsonObject bgObj = new JsonObject();
+        for (Map.Entry<String, Boolean> e : bannerGuaranteed.entrySet()) {
+            bgObj.addProperty(e.getKey(), e.getValue());
+        }
+        obj.add("bannerGuaranteed", bgObj);
+
+        JsonObject bpObj = new JsonObject();
+        for (Map.Entry<String, Integer> e : bannerPulls.entrySet()) {
+            bpObj.addProperty(e.getKey(), e.getValue());
+        }
+        obj.add("bannerPulls", bpObj);
+
+        // Save History
+        JsonArray hArr = new JsonArray();
+        for (PullHistoryRecord h : history) {
+            JsonObject hObj = new JsonObject();
+            hObj.addProperty("banner", h.getBannerId());
+            hObj.addProperty("item", h.getItemId());
+            hObj.addProperty("name", h.getItemName());
+            hObj.addProperty("stars", h.getStars());
+            hObj.addProperty("time", h.getTimestamp());
+            hObj.addProperty("pity", h.getPityCount());
+            hArr.add(hObj);
+        }
+        obj.add("history", hArr);
+
+        // Save Mailbox
+        JsonArray mArr = new JsonArray();
+        for (MailboxItem m : mailbox) {
+            JsonObject mObj = new JsonObject();
+            mObj.addProperty("mailId", m.getMailId());
+            mObj.addProperty("banner", m.getBannerId());
+            mObj.addProperty("item", m.getItemId());
+            mObj.addProperty("count", m.getCount());
+            mObj.addProperty("stars", m.getStars());
+            if (m.getCustomName() != null) mObj.addProperty("name", m.getCustomName());
+            if (m.getSnbt() != null) mObj.addProperty("snbt", m.getSnbt());
+            mObj.addProperty("time", m.getTimestamp());
+            mArr.add(mObj);
+        }
+        obj.add("mailbox", mArr);
+
+        Gson gson = new GsonBuilder().setPrettyPrinting().create();
         try {
-            File dir = new File("config/ling_gacha/playerdata");
-            if (!dir.exists()) dir.mkdirs();
-
-            File file = new File(dir, playerUuid + ".json");
-            JsonObject obj = new JsonObject();
-            obj.addProperty("total", totalPulls);
-            obj.addProperty("corals", afterglowCorals);
-
-            // Save Banner Pity Maps
-            JsonObject p5Obj = new JsonObject();
-            for (Map.Entry<String, Integer> e : bannerPity5.entrySet()) {
-                p5Obj.addProperty(e.getKey(), e.getValue());
-            }
-            obj.add("bannerPity5", p5Obj);
-
-            JsonObject p4Obj = new JsonObject();
-            for (Map.Entry<String, Integer> e : bannerPity4.entrySet()) {
-                p4Obj.addProperty(e.getKey(), e.getValue());
-            }
-            obj.add("bannerPity4", p4Obj);
-
-            JsonObject bgObj = new JsonObject();
-            for (Map.Entry<String, Boolean> e : bannerGuaranteed.entrySet()) {
-                bgObj.addProperty(e.getKey(), e.getValue());
-            }
-            obj.add("bannerGuaranteed", bgObj);
-
-            JsonObject bpObj = new JsonObject();
-            for (Map.Entry<String, Integer> e : bannerPulls.entrySet()) {
-                bpObj.addProperty(e.getKey(), e.getValue());
-            }
-            obj.add("bannerPulls", bpObj);
-
-            // Save History
-            JsonArray hArr = new JsonArray();
-            for (PullHistoryRecord h : history) {
-                JsonObject hObj = new JsonObject();
-                hObj.addProperty("banner", h.getBannerId());
-                hObj.addProperty("item", h.getItemId());
-                hObj.addProperty("name", h.getItemName());
-                hObj.addProperty("stars", h.getStars());
-                hObj.addProperty("time", h.getTimestamp());
-                hObj.addProperty("pity", h.getPityCount());
-                hArr.add(hObj);
-            }
-            obj.add("history", hArr);
-
-            // Save Mailbox
-            JsonArray mArr = new JsonArray();
-            for (MailboxItem m : mailbox) {
-                JsonObject mObj = new JsonObject();
-                mObj.addProperty("mailId", m.getMailId());
-                mObj.addProperty("banner", m.getBannerId());
-                mObj.addProperty("item", m.getItemId());
-                mObj.addProperty("count", m.getCount());
-                mObj.addProperty("stars", m.getStars());
-                if (m.getCustomName() != null) mObj.addProperty("name", m.getCustomName());
-                if (m.getSnbt() != null) mObj.addProperty("snbt", m.getSnbt());
-                mObj.addProperty("time", m.getTimestamp());
-                mArr.add(mObj);
-            }
-            obj.add("mailbox", mArr);
-
-            Gson gson = new GsonBuilder().setPrettyPrinting().create();
-            try (FileWriter writer = new FileWriter(file)) {
+            try (FileWriter writer = new FileWriter(tempFile)) {
                 gson.toJson(obj, writer);
             }
-        } catch (Exception ignored) {}
+            try {
+                Files.move(tempFile.toPath(), file.toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+            } catch (Exception eAtomic) {
+                Files.move(tempFile.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING);
+            }
+        } catch (Exception e) {
+            LOGGER.error("[Ling Gacha] Failed to save player data atomically for {}", playerUuid, e);
+        }
     }
 }

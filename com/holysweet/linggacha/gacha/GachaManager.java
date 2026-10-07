@@ -12,12 +12,15 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.item.ItemStack;
 import org.slf4j.Logger;
 
 import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
+import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
@@ -42,6 +45,21 @@ public class GachaManager {
 
     public PlayerGachaData getPlayerData(UUID uuid) {
         return playerDataCache.computeIfAbsent(uuid, PlayerGachaData::load);
+    }
+
+    public void unloadPlayerData(UUID uuid) {
+        PlayerGachaData data = playerDataCache.remove(uuid);
+        if (data != null) {
+            data.save();
+        }
+    }
+
+    public void saveAllPlayerData() {
+        for (PlayerGachaData data : playerDataCache.values()) {
+            if (data != null) {
+                data.save();
+            }
+        }
     }
 
     public synchronized void addOrUpdateBanner(String id, String title, String subtitle, GachaBanner.BannerType type, int cost, int discount, String preview, String background, MinecraftServer server) {
@@ -121,6 +139,11 @@ public class GachaManager {
             return Collections.emptyList();
         }
 
+        if (banner.getItems().isEmpty()) {
+            player.sendSystemMessage(Component.literal("§c[Convene] This banner currently has no items configured!"));
+            return Collections.emptyList();
+        }
+
         int totalCost = (pullCount == 10) ? banner.getTenPullCost() : banner.getCostPerPull();
         int currentBalance = CoinsService.get(player.serverLevel(), player);
 
@@ -135,47 +158,56 @@ public class GachaManager {
         PlayerGachaData data = getPlayerData(player.getUUID());
         List<GachaItemEntry> results = new ArrayList<>();
 
-        for (int i = 0; i < pullCount; i++) {
-            int pityBefore = data.getPity5Star(bannerId);
-            GachaItemEntry prize = rollSingle(player, banner, data);
-            results.add(prize);
+        try {
+            for (int i = 0; i < pullCount; i++) {
+                int pityBefore = data.getPity5Star(bannerId);
+                GachaItemEntry prize = rollSingle(player, banner, data);
+                results.add(prize);
 
-            // Record pull history
-            String itemName = (prize.getCustomName() != null && !prize.getCustomName().isEmpty()) ? prize.getCustomName() : prize.getItemId();
-            data.addHistoryRecord(new PlayerGachaData.PullHistoryRecord(
-                    bannerId,
-                    prize.getItemId(),
-                    itemName,
-                    prize.getRarity().getStars(),
-                    System.currentTimeMillis(),
-                    pityBefore + 1
-            ));
+                // Record pull history
+                String itemName = (prize.getCustomName() != null && !prize.getCustomName().isEmpty()) ? prize.getCustomName() : prize.getItemId();
+                data.addHistoryRecord(new PlayerGachaData.PullHistoryRecord(
+                        bannerId,
+                        prize.getItemId(),
+                        itemName,
+                        prize.getRarity().getStars(),
+                        System.currentTimeMillis(),
+                        pityBefore + 1
+                ));
 
-            // Add item to persistent Mailbox (Safe Storage)
-            data.addMailboxItem(new PlayerGachaData.MailboxItem(
-                    UUID.randomUUID().toString(),
-                    bannerId,
-                    prize.getItemId(),
-                    prize.getCount(),
-                    prize.getRarity().getStars(),
-                    prize.getCustomName(),
-                    prize.getSnbt(),
-                    System.currentTimeMillis()
-            ));
+                // Add item to persistent Mailbox (Safe Storage)
+                data.addMailboxItem(new PlayerGachaData.MailboxItem(
+                        UUID.randomUUID().toString(),
+                        bannerId,
+                        prize.getItemId(),
+                        prize.getCount(),
+                        prize.getRarity().getStars(),
+                        prize.getCustomName(),
+                        prize.getSnbt(),
+                        System.currentTimeMillis()
+                ));
 
-            // Award Corals
-            if (prize.getRarity() == GachaRarity.FIVE_STAR) {
-                data.addCorals(15);
-            } else if (prize.getRarity() == GachaRarity.FOUR_STAR) {
-                data.addCorals(3);
-            } else {
-                data.addCorals(1);
+                // Award Corals
+                if (prize.getRarity() == GachaRarity.FIVE_STAR) {
+                    data.addCorals(15);
+                } else if (prize.getRarity() == GachaRarity.FOUR_STAR) {
+                    data.addCorals(3);
+                } else {
+                    data.addCorals(1);
+                }
             }
-        }
 
-        data.save();
-        GachaNet.syncDataToPlayer(player);
-        return results;
+            data.save();
+            GachaNet.syncDataToPlayer(player);
+            return results;
+        } catch (Throwable t) {
+            LOGGER.error("[Ling Gacha] Unexpected error during convene for player {}. Rolling back Primogems.", player.getName().getString(), t);
+            // Rollback coins
+            CoinsService.add(player.serverLevel(), player, totalCost);
+            com.holysweet.questshop.network.Net.syncBalance(player);
+            player.sendSystemMessage(Component.literal("§c[Convene] An unexpected error occurred. Your " + totalCost + " Primogems have been refunded!"));
+            return Collections.emptyList();
+        }
     }
 
     public synchronized void claimMailboxItem(ServerPlayer player, String mailId) {
@@ -189,15 +221,43 @@ public class GachaManager {
         PlayerGachaData.MailboxItem mailItem = itemOpt.get();
 
         ItemStack stack = createItemStackFromMail(player, mailItem);
-        if (player.getInventory().add(stack)) {
+        if (!canFitInInventory(player.getInventory(), stack)) {
+            player.sendSystemMessage(Component.literal("§c[Ling Gacha] Inventory full! Please free up space before claiming."));
+            return;
+        }
+
+        int originalCount = stack.getCount();
+        boolean added = player.getInventory().add(stack);
+        if (added || stack.isEmpty()) {
             data.removeMailboxItem(mailId);
             data.save();
             GachaNet.sendMailboxToPlayer(player);
             GachaNet.syncDataToPlayer(player);
-            String name = (mailItem.getCustomName() != null) ? mailItem.getCustomName() : stack.getHoverName().getString();
-            player.sendSystemMessage(Component.literal("§a[Ling Gacha] Claimed: " + name + " x" + mailItem.getCount() + "!"));
+            String name = (mailItem.getCustomName() != null && !mailItem.getCustomName().isEmpty())
+                    ? mailItem.getCustomName() : stack.getHoverName().getString();
+            player.sendSystemMessage(Component.literal("§a[Ling Gacha] Claimed: " + name + " x" + originalCount + "!"));
         } else {
-            player.sendSystemMessage(Component.literal("§c[Ling Gacha] Inventory full! Please free up space before claiming."));
+            // Partial addition fallback: update remaining count in mailbox to prevent duplication
+            if (stack.getCount() < originalCount) {
+                data.removeMailboxItem(mailId);
+                data.addMailboxItem(new PlayerGachaData.MailboxItem(
+                        mailId,
+                        mailItem.getBannerId(),
+                        mailItem.getItemId(),
+                        stack.getCount(),
+                        mailItem.getStars(),
+                        mailItem.getCustomName(),
+                        mailItem.getSnbt(),
+                        mailItem.getTimestamp()
+                ));
+                data.save();
+                GachaNet.sendMailboxToPlayer(player);
+                GachaNet.syncDataToPlayer(player);
+                player.sendSystemMessage(Component.literal("§e[Ling Gacha] Inventory partially full! Claimed x"
+                        + (originalCount - stack.getCount()) + ", remaining x" + stack.getCount() + " in mailbox."));
+            } else {
+                player.sendSystemMessage(Component.literal("§c[Ling Gacha] Inventory full! Please free up space before claiming."));
+            }
         }
     }
 
@@ -215,11 +275,33 @@ public class GachaManager {
 
         for (PlayerGachaData.MailboxItem mailItem : items) {
             ItemStack stack = createItemStackFromMail(player, mailItem);
-            if (player.getInventory().add(stack)) {
+            if (!canFitInInventory(player.getInventory(), stack)) {
+                failedCount++;
+                continue;
+            }
+
+            int origCount = stack.getCount();
+            boolean added = player.getInventory().add(stack);
+            if (added || stack.isEmpty()) {
                 data.removeMailboxItem(mailItem.getMailId());
                 claimedCount++;
             } else {
-                failedCount++;
+                if (stack.getCount() < origCount) {
+                    data.removeMailboxItem(mailItem.getMailId());
+                    data.addMailboxItem(new PlayerGachaData.MailboxItem(
+                            mailItem.getMailId(),
+                            mailItem.getBannerId(),
+                            mailItem.getItemId(),
+                            stack.getCount(),
+                            mailItem.getStars(),
+                            mailItem.getCustomName(),
+                            mailItem.getSnbt(),
+                            mailItem.getTimestamp()
+                    ));
+                    claimedCount++;
+                } else {
+                    failedCount++;
+                }
             }
         }
 
@@ -235,8 +317,32 @@ public class GachaManager {
         }
     }
 
+    public static boolean canFitInInventory(Inventory inv, ItemStack stack) {
+        if (stack.isEmpty()) return true;
+        int remaining = stack.getCount();
+        int maxStack = Math.min(stack.getMaxStackSize(), inv.getMaxStackSize());
+
+        for (int i = 0; i < 36; i++) {
+            ItemStack slotItem = inv.getItem(i);
+            if (slotItem.isEmpty()) {
+                remaining -= maxStack;
+            } else if (ItemStack.isSameItemSameComponents(slotItem, stack)) {
+                int room = maxStack - slotItem.getCount();
+                if (room > 0) {
+                    remaining -= room;
+                }
+            }
+            if (remaining <= 0) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private ItemStack createItemStackFromMail(ServerPlayer player, PlayerGachaData.MailboxItem mailItem) {
         ItemStack stack = ItemStack.EMPTY;
+        int targetCount = Math.max(1, mailItem.getCount());
+
         if (mailItem.getSnbt() != null && !mailItem.getSnbt().isEmpty()) {
             try {
                 var tag = net.minecraft.nbt.TagParser.parseTag(mailItem.getSnbt());
@@ -248,13 +354,16 @@ public class GachaManager {
                 ResourceLocation rl = ResourceLocation.parse(mailItem.getItemId());
                 var itemOpt = BuiltInRegistries.ITEM.getOptional(rl);
                 if (itemOpt.isPresent()) {
-                    stack = new ItemStack(itemOpt.get(), mailItem.getCount());
+                    stack = new ItemStack(itemOpt.get(), targetCount);
                 }
             } catch (Exception ignored) {}
         }
         if (stack.isEmpty()) {
-            stack = new ItemStack(net.minecraft.world.item.Items.DIRT, mailItem.getCount());
+            stack = new ItemStack(net.minecraft.world.item.Items.DIRT, targetCount);
+        } else {
+            stack.setCount(targetCount);
         }
+
         if (mailItem.getCustomName() != null && !mailItem.getCustomName().isEmpty()) {
             stack.set(net.minecraft.core.component.DataComponents.CUSTOM_NAME, Component.literal(mailItem.getCustomName()));
         }
@@ -288,10 +397,30 @@ public class GachaManager {
             return selectFiveStar(player, banner, data);
         } else if (roll < (fiveStarChance + fourStarChance)) {
             data.resetPity4Star(bannerId);
-            return selectRandomItem(banner.getItemsByRarity(GachaRarity.FOUR_STAR));
+            return selectFourStar(banner);
         } else {
             return selectRandomItem(banner.getItemsByRarity(GachaRarity.THREE_STAR));
         }
+    }
+
+    private GachaItemEntry selectFourStar(GachaBanner banner) {
+        List<GachaItemEntry> rateUp = banner.getRateUpItems(GachaRarity.FOUR_STAR);
+        List<GachaItemEntry> standard = banner.getStandardItems(GachaRarity.FOUR_STAR);
+
+        // If rate-up 4-stars exist on featured banners, give 50% chance for rate-up
+        if (!rateUp.isEmpty() && (banner.getBannerType() == GachaBanner.BannerType.FEATURED_RESONATOR || banner.getBannerType() == GachaBanner.BannerType.FEATURED_WEAPON)) {
+            if (standard.isEmpty() || ThreadLocalRandom.current().nextDouble() < 0.5) {
+                return selectRandomItem(rateUp);
+            } else {
+                return selectRandomItem(standard);
+            }
+        }
+
+        List<GachaItemEntry> allFourStars = banner.getItemsByRarity(GachaRarity.FOUR_STAR);
+        if (!allFourStars.isEmpty()) {
+            return selectRandomItem(allFourStars);
+        }
+        return selectRandomItem(banner.getItems());
     }
 
     private GachaItemEntry selectFiveStar(ServerPlayer player, GachaBanner banner, PlayerGachaData data) {
@@ -302,13 +431,14 @@ public class GachaManager {
             List<GachaItemEntry> rateUp = banner.getRateUpItems(GachaRarity.FIVE_STAR);
             List<GachaItemEntry> standard = banner.getStandardItems(GachaRarity.FIVE_STAR);
 
-            if (data.isGuaranteed(bannerId) || ThreadLocalRandom.current().nextDouble() < 0.5) {
-                // Won 50/50 or was guaranteed
+            // If there are no standard 5-stars configured, the player cannot lose 50/50
+            if (data.isGuaranteed(bannerId) || standard.isEmpty() || ThreadLocalRandom.current().nextDouble() < 0.5) {
+                // Won 50/50 or was guaranteed or no standard pool exists
                 result = selectRandomItem(!rateUp.isEmpty() ? rateUp : banner.getItemsByRarity(GachaRarity.FIVE_STAR));
                 data.setGuaranteed(bannerId, false);
             } else {
-                // Lost 50/50
-                result = selectRandomItem(!standard.isEmpty() ? standard : banner.getItemsByRarity(GachaRarity.FIVE_STAR));
+                // Lost 50/50 to an actual standard item
+                result = selectRandomItem(standard);
                 data.setGuaranteed(bannerId, true);
                 player.sendSystemMessage(Component.literal("§e[Convene] 50/50 lost! Your next 5★ is 100% guaranteed featured!"));
             }
@@ -320,8 +450,8 @@ public class GachaManager {
             result = selectRandomItem(banner.getItemsByRarity(GachaRarity.FIVE_STAR));
         }
 
-        // Server-wide broadcast for 5-star items!
-        if (result != null && player.getServer() != null) {
+        // Server-wide broadcast for legitimate 5-star items!
+        if (result != null && result.getRarity() == GachaRarity.FIVE_STAR && player.getServer() != null) {
             String msg = "§6§l★ GACHA ★ §f" + player.getName().getString() + " pulled 5★ §e" + (result.getCustomName() != null ? result.getCustomName() : result.getItemId()) + "§f!";
             player.getServer().getPlayerList().broadcastSystemMessage(Component.literal(msg), false);
         }
@@ -443,6 +573,7 @@ public class GachaManager {
             if (!dir.exists()) dir.mkdirs();
 
             File file = new File(dir, "banners.json");
+            File tempFile = new File(dir, "banners.json.tmp");
             JsonArray array = new JsonArray();
 
             for (GachaBanner banner : banners) {
@@ -475,8 +606,13 @@ public class GachaManager {
             }
 
             Gson gson = new GsonBuilder().setPrettyPrinting().create();
-            try (FileWriter writer = new FileWriter(file)) {
+            try (FileWriter writer = new FileWriter(tempFile)) {
                 gson.toJson(array, writer);
+            }
+            try {
+                Files.move(tempFile.toPath(), file.toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+            } catch (Exception eAtomic) {
+                Files.move(tempFile.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING);
             }
         } catch (Exception e) {
             LOGGER.error("[Ling Gacha] Failed to save banners.json", e);

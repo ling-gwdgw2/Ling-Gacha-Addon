@@ -42,7 +42,7 @@ public class GachaNet {
 
                             List<ConveneResultPayload.PrizeData> prizeList = new ArrayList<>();
                             for (GachaItemEntry item : results) {
-                                prizeList.add(new ConveneResultPayload.PrizeData(item.getItemId(), item.getCount(), item.getRarity().getStars(), item.getCustomName()));
+                                prizeList.add(new ConveneResultPayload.PrizeData(item.getItemId(), item.getCount(), item.getRarity().getStars(), item.getCustomName(), item.getSnbt()));
                             }
 
                             PacketDistributor.sendToPlayer(player, new ConveneResultPayload(payload.bannerId(), prizeList, highestStars, pity5, data.getAfterglowCorals()));
@@ -303,6 +303,19 @@ public class GachaNet {
             String featuredSnbt = (featured != null) ? featured.getSnbt() : null;
             int pity = data.getPity5Star(b.getId());
 
+            List<SyncBannerDataPayload.BannerItemData> bannerItems = new ArrayList<>();
+            for (GachaItemEntry entry : b.getItems()) {
+                bannerItems.add(new SyncBannerDataPayload.BannerItemData(
+                        entry.getItemId(),
+                        entry.getCount(),
+                        entry.getRarity().getStars(),
+                        entry.getCustomName(),
+                        entry.getWeight(),
+                        entry.isRateUp(),
+                        entry.getSnbt()
+                ));
+            }
+
             clientBanners.add(new SyncBannerDataPayload.ClientBannerInfo(
                     b.getId(),
                     b.getTitle(),
@@ -315,7 +328,8 @@ public class GachaNet {
                     featuredSnbt,
                     b.getBackgroundImage(),
                     b.getItems().size(),
-                    pity
+                    pity,
+                    bannerItems
             ));
         }
 
@@ -364,7 +378,7 @@ public class GachaNet {
 
     public static boolean canAdmin(ServerPlayer player) {
         if (player == null) return false;
-        if (player.hasPermissions(2) || player.isCreative()) return true;
+        if (player.hasPermissions(2)) return true;
         if (player.getServer() != null && player.getServer().isSingleplayerOwner(player.getGameProfile())) return true;
         return false;
     }

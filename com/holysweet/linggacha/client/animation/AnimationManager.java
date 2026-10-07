@@ -150,6 +150,11 @@ public class AnimationManager {
     }
 
     public static void clearCache() {
+        for (AnimatedTexture anim : CACHE.values()) {
+            if (anim != null) {
+                anim.release();
+            }
+        }
         CACHE.clear();
     }
 }
