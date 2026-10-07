@@ -526,7 +526,7 @@ public class GachaRevealScreen extends Screen {
         guiGraphics.fillGradient(0, 0, this.width, this.height, 0xFF0F0B24, 0xFF05050C);
 
         // Header Title
-        String title = "✦ CONVENE RESULTS // สรุปผลการสุ่ม ✦";
+        String title = "✦ CONVENE RESULTS ✦";
         int titleX = this.width / 2 - this.font.width(title) / 2;
         guiGraphics.drawString(this.font, title, titleX, 13, 0xFFFFD700, true);
         guiGraphics.fill(titleX - 16, 24, titleX + this.font.width(title) + 16, 25, 0x88FFD700);
@@ -547,7 +547,7 @@ public class GachaRevealScreen extends Screen {
         }
 
         // Bottom hint
-        String hint = "§8• §7ชี้เมาส์ที่การ์ดเพื่อดูข้อมูลและสเตตัสไอเทม (Hover to inspect)";
+        String hint = "§8• §7Hover over card to inspect details & stats";
         guiGraphics.drawString(this.font, hint, this.width / 2 - this.font.width(hint) / 2, this.height - 48, 0xFFA0A0C0, true);
     }
 

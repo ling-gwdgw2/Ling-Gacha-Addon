@@ -17,7 +17,7 @@ public class GachaDetailsModal {
     private final GachaScreen parent;
     private final SyncBannerDataPayload.ClientBannerInfo banner;
 
-    // Tabs: 0 = Item Pool (คลังไอเทม), 1 = Rates & Rules (อัตราสุ่มและกฎ)
+    // Tabs: 0 = Item Pool, 1 = Rates & Rules
     private int activeTab = 0;
 
     // Item Pool Filter & Scrolling
@@ -133,7 +133,7 @@ public class GachaDetailsModal {
         renderFilterPill(guiGraphics, font, modalX + 119, filterY, 32, filterH, "3★", poolFilter == 3, mouseX, mouseY);
 
         // Hint Text on Right
-        String hint = "§8• §7ชี้เมาส์เพื่อดูข้อมูลไอเทม";
+        String hint = "§8• §7Hover over item to view details";
         guiGraphics.drawString(font, hint, modalX + modalW - font.width(hint) - 10, filterY + 4, 0xFFA0A0C0, true);
 
         // Items Content Area

@@ -55,7 +55,7 @@ public class InventoryGachaButton {
             GachaMenuButton pauseBtn = new GachaMenuButton(
                     x, y, 20, 20,
                     btn -> PacketDistributor.sendToServer(new RequestOpenGachaPayload()),
-                    Tooltip.create(Component.literal("Ling Gacha (เปิดตู้สุ่มกาชา)"))
+                    Tooltip.create(Component.literal("Ling Gacha Convene"))
             );
 
             event.addListener(pauseBtn);
