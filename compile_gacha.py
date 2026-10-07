@@ -108,11 +108,47 @@ for root, _, files in os.walk(os.path.join(project_root, "com")):
 
 print(f"Compiling {len(java_files)} Java files for Java 21 with {len(cp_jars)} valid classpath JARs...")
 
+def find_javac():
+    # 1. If JAVA_HOME is specifically Java 21, use it
+    if "JAVA_HOME" in os.environ and os.environ["JAVA_HOME"]:
+        jh = os.environ["JAVA_HOME"]
+        if "21" in jh:
+            cand = os.path.join(jh, "bin", "javac.exe" if os.name == "nt" else "javac")
+            if os.path.exists(cand):
+                return cand
+
+    # 2. Prioritize dedicated JDK 21 installation locations on Windows
+    for glob_pattern in [
+        r"C:\Program Files\Eclipse Adoptium\jdk-21*\bin\javac.exe",
+        r"C:\Program Files\Java\jdk-21*\bin\javac.exe",
+        r"C:\Program Files\Microsoft\jdk-21*\bin\javac.exe",
+        r"C:\Program Files\BellSoft\LibericaJDK-21*\bin\javac.exe",
+        r"C:\Program Files\Zulu\zulu-21*\bin\javac.exe"
+    ]:
+        matches = glob.glob(glob_pattern)
+        if matches:
+            return matches[0]
+
+    # 3. Fallback to generic JAVA_HOME
+    if "JAVA_HOME" in os.environ and os.environ["JAVA_HOME"]:
+        cand = os.path.join(os.environ["JAVA_HOME"], "bin", "javac.exe" if os.name == "nt" else "javac")
+        if os.path.exists(cand):
+            return cand
+
+    # 4. Fallback to system PATH
+    which_javac = shutil.which("javac")
+    if which_javac:
+        return which_javac
+
+    return r"C:\Program Files\Eclipse Adoptium\jdk-21.0.12.8-hotspot\bin\javac.exe"
+
 args_txt = os.path.join(project_root, "args.txt")
 with open(args_txt, "w", encoding="utf-8") as f:
     f.write("-encoding\nUTF-8\n")
     f.write("-source\n21\n")
     f.write("-target\n21\n")
+    f.write("-Xlint:deprecation\n")
+    f.write("-Xlint:unchecked\n")
     f.write("-proc:none\n")
     f.write("-sourcepath\n")
     f.write(f'"{project_root.replace(os.sep, "/")}"\n')
@@ -124,16 +160,21 @@ with open(args_txt, "w", encoding="utf-8") as f:
         f.write(f'"{jf}"\n')
 
 # 3. Invoke Javac using argfile
+javac_bin = find_javac()
+print(f"Using Java compiler: {javac_bin}")
 javac_cmd = [
-    "C:\\Program Files\\Eclipse Adoptium\\jdk-21.0.12.8-hotspot\\bin\\javac.exe",
+    javac_bin,
     "@" + args_txt.replace("\\", "/")
 ]
 
 res = subprocess.run(javac_cmd, capture_output=True, text=True)
 if res.stdout:
-    print("STDOUT:", res.stdout)
+    print(res.stdout)
 if res.stderr:
-    print("STDERR:", res.stderr)
+    if res.returncode == 0:
+        print("[Compiler Warnings/Notes]:\n" + res.stderr)
+    else:
+        print("[Compiler Errors]:\n" + res.stderr)
 
 if os.path.exists(args_txt):
     os.remove(args_txt)
@@ -187,5 +228,15 @@ with zipfile.ZipFile(out_jar, "w", zipfile.ZIP_DEFLATED) as z:
 shutil.copyfile(out_jar, root_jar)
 print(f"Build complete! Output JAR: {out_jar}")
 print(f"Release JAR: {root_jar}")
+
+# Auto-deploy to CurseForge instance (if present)
+cf_mods_dir = os.path.join(user_home, "curseforge", "minecraft", "Instances", "Ars Sky Island", "mods")
+if os.path.exists(cf_mods_dir):
+    try:
+        deployed_jar = os.path.join(cf_mods_dir, "LingGachaAddon-1.0.0+1.21.1-neoforge.jar")
+        shutil.copyfile(out_jar, deployed_jar)
+        print(f"Auto-deployed to CurseForge: {deployed_jar}")
+    except Exception as e:
+        print(f"CurseForge deploy skipped: {e}")
 
 
