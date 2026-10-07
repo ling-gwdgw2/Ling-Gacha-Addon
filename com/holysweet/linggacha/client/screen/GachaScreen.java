@@ -41,11 +41,8 @@ public class GachaScreen extends Screen {
     private final int headerHeight = 32;
     private final int bottomBarHeight = 42;
 
-    // Banner Item Pool State
-    private int poolScrollOffset = 0;
-    private int poolFilter = 0; // 0 = ALL, 5 = 5-Star, 4 = 4-Star, 3 = 3-Star
-    private ItemStack hoveredPoolStack = ItemStack.EMPTY;
     private final Map<String, ItemStack> itemStackCache = new HashMap<>();
+    private Button viewPoolStageBtn;
 
     // Normal User Controls
     private Button pull1Btn;
@@ -103,6 +100,20 @@ public class GachaScreen extends Screen {
         this.detailsBtn = Button.builder(Component.literal("Details"), b -> openDetails())
                 .bounds(14, actionY, 68, 22).build();
         this.addRenderableWidget(detailsBtn);
+
+        // Stage View Pool Button
+        int stageX = sidebarWidth;
+        int stageY = headerHeight;
+        int textOffsetAdmin = editMode ? 26 : 0;
+        int bannerTitleY = stageY + 20 + textOffsetAdmin;
+        int badgePityY = bannerTitleY + 30;
+
+        SyncBannerDataPayload.ClientBannerInfo currentBanner = getCurrentBanner();
+        this.viewPoolStageBtn = Button.builder(
+                Component.literal("✦ View Items (" + currentBanner.items().size() + ")"),
+                b -> openDetails())
+                .bounds(stageX + 24, badgePityY + 24, 118, 20).build();
+        this.addRenderableWidget(viewPoolStageBtn);
 
         this.historyBtn = Button.builder(Component.literal("History"), b -> openHistory())
                 .bounds(86, actionY, 68, 22).build();
@@ -174,6 +185,12 @@ public class GachaScreen extends Screen {
             poolManagerBtn.visible = editMode;
         if (newBannerBtn != null)
             newBannerBtn.visible = editMode;
+        if (viewPoolStageBtn != null) {
+            int textOffsetAdmin = editMode ? 26 : 0;
+            int bannerTitleY = headerHeight + 20 + textOffsetAdmin;
+            int badgePityY = bannerTitleY + 30;
+            viewPoolStageBtn.setY(badgePityY + 24);
+        }
     }
 
     public void refreshData() {
@@ -309,6 +326,9 @@ public class GachaScreen extends Screen {
         if (poolManagerBtn != null) {
             poolManagerBtn.setMessage(Component.literal("§bPool (" + banner.totalItems() + ")"));
         }
+        if (viewPoolStageBtn != null) {
+            viewPoolStageBtn.setMessage(Component.literal("✦ View Items (" + banner.items().size() + ")"));
+        }
     }
 
     @Override
@@ -343,39 +363,8 @@ public class GachaScreen extends Screen {
             int y = tabY + i * (tabH + 4);
             if (mouseX >= tabX && mouseX <= tabX + tabW && mouseY >= y && mouseY <= y + tabH) {
                 this.selectedBannerIndex = i;
-                this.poolScrollOffset = 0;
                 ClientGachaData.setLastSelectedBannerIndex(i);
                 updateButtons();
-                return true;
-            }
-        }
-
-        // Check Banner Item Pool filter pills (when no modal is active)
-        int stageX = sidebarWidth;
-        int stageY = headerHeight;
-        int stageW = this.width - sidebarWidth;
-        int poolPanelW = Math.max(260, Math.min(360, (int) (stageW * 0.52f)));
-        int poolPanelX = stageX + stageW - poolPanelW - 16;
-        int poolPanelY = stageY + 12;
-        int filterY = poolPanelY + 26 + 6;
-        int filterH = 16;
-
-        if (mouseY >= filterY && mouseY <= filterY + filterH) {
-            if (mouseX >= poolPanelX + 8 && mouseX <= poolPanelX + 48) {
-                this.poolFilter = 0;
-                this.poolScrollOffset = 0;
-                return true;
-            } else if (mouseX >= poolPanelX + 52 && mouseX <= poolPanelX + 88) {
-                this.poolFilter = 5;
-                this.poolScrollOffset = 0;
-                return true;
-            } else if (mouseX >= poolPanelX + 92 && mouseX <= poolPanelX + 128) {
-                this.poolFilter = 4;
-                this.poolScrollOffset = 0;
-                return true;
-            } else if (mouseX >= poolPanelX + 132 && mouseX <= poolPanelX + 168) {
-                this.poolFilter = 3;
-                this.poolScrollOffset = 0;
                 return true;
             }
         }
@@ -385,6 +374,9 @@ public class GachaScreen extends Screen {
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
+        if (activeDetailsModal != null) {
+            return activeDetailsModal.mouseScrolled(mouseX, mouseY, scrollX, scrollY);
+        }
         if (activeItemPoolModal != null) {
             return activeItemPoolModal.mouseScrolled(mouseX, mouseY, scrollX, scrollY);
         }
@@ -393,39 +385,6 @@ public class GachaScreen extends Screen {
         }
         if (activeMailboxModal != null) {
             return activeMailboxModal.mouseScrolled(mouseX, mouseY, scrollX, scrollY);
-        }
-
-        // Scroll Banner Item Pool panel
-        int stageX = sidebarWidth;
-        int stageY = headerHeight;
-        int stageW = this.width - sidebarWidth;
-        int stageH = this.height - headerHeight - bottomBarHeight;
-        int poolPanelW = Math.max(260, Math.min(360, (int) (stageW * 0.52f)));
-        int poolPanelH = stageH - 24;
-        int poolPanelX = stageX + stageW - poolPanelW - 16;
-        int poolPanelY = stageY + 12;
-
-        if (mouseX >= poolPanelX && mouseX <= poolPanelX + poolPanelW && mouseY >= poolPanelY && mouseY <= poolPanelY + poolPanelH) {
-            SyncBannerDataPayload.ClientBannerInfo current = getCurrentBanner();
-            int matchingCount = 0;
-            for (SyncBannerDataPayload.BannerItemData item : current.items()) {
-                if (poolFilter == 0 || poolFilter == item.stars()) matchingCount++;
-            }
-            int totalRows = (matchingCount + 1) / 2;
-            int filterY = poolPanelY + 26 + 6;
-            int contentY = filterY + 16 + 6;
-            int contentH = poolPanelH - (contentY - poolPanelY) - 6;
-            int visibleRows = Math.max(1, contentH / 32);
-            int maxScroll = Math.max(0, totalRows - visibleRows);
-            if (maxScroll > 0) {
-                if (scrollY > 0) {
-                    poolScrollOffset = Math.max(0, poolScrollOffset - 1);
-                    return true;
-                } else if (scrollY < 0) {
-                    poolScrollOffset = Math.min(maxScroll, poolScrollOffset + 1);
-                    return true;
-                }
-            }
         }
 
         return super.mouseScrolled(mouseX, mouseY, scrollX, scrollY);
@@ -477,8 +436,6 @@ public class GachaScreen extends Screen {
 
     @Override
     public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
-        this.hoveredPoolStack = ItemStack.EMPTY;
-
         // 1. FULLSCREEN CANVAS BASE BACKGROUND
         guiGraphics.fill(0, 0, this.width, this.height, 0xFF080812);
 
@@ -525,8 +482,11 @@ public class GachaScreen extends Screen {
         guiGraphics.fill(badgePityX + 1, badgePityY + 1, badgePityX + pityTextW + 15, badgePityY + 17, 0xCC1A1A32);
         guiGraphics.drawString(this.font, pityText, badgePityX + 8, badgePityY + 5, 0xFFFFD700, true);
 
-        // --- BANNER ITEM POOL SHOWCASE (Right Side of Stage) ---
-        renderBannerItemPool(guiGraphics, current, stageX, stageY, stageW, stageH, mouseX, mouseY);
+        // Keep stage button visibility synced
+        if (viewPoolStageBtn != null) {
+            viewPoolStageBtn.visible = (activeDetailsModal == null && activeHistoryModal == null && activeMailboxModal == null
+                    && activeItemAddEditModal == null && activeItemPoolModal == null && activeBannerSettingsModal == null);
+        }
 
         // 3. LEFT SIDEBAR (Banner Tabs)
         guiGraphics.fill(0, headerHeight, sidebarWidth, this.height - bottomBarHeight, 0xFA0D0D18);
@@ -602,14 +562,6 @@ public class GachaScreen extends Screen {
 
         super.render(guiGraphics, mouseX, mouseY, partialTick);
 
-        // Native Minecraft tooltip for hovered pool item
-        if (activeDetailsModal == null && activeHistoryModal == null && activeMailboxModal == null
-                && activeItemAddEditModal == null && activeItemPoolModal == null && activeBannerSettingsModal == null) {
-            if (hoveredPoolStack != null && !hoveredPoolStack.isEmpty()) {
-                guiGraphics.renderTooltip(this.font, hoveredPoolStack, mouseX, mouseY);
-            }
-        }
-
         // 6. RENDER ACTIVE MODAL OVERLAYS (Full-Screen Centered with Dim)
         if (activeDetailsModal != null) {
             activeDetailsModal.render(guiGraphics, mouseX, mouseY, partialTick, this.width, this.height);
@@ -626,190 +578,7 @@ public class GachaScreen extends Screen {
         }
     }
 
-    private void renderBannerItemPool(GuiGraphics guiGraphics, SyncBannerDataPayload.ClientBannerInfo current, int stageX, int stageY, int stageW, int stageH, int mouseX, int mouseY) {
-        int poolPanelW = Math.max(260, Math.min(360, (int) (stageW * 0.52f)));
-        int poolPanelH = stageH - 24;
-        int poolPanelX = stageX + stageW - poolPanelW - 16;
-        int poolPanelY = stageY + 12;
-
-        // Container Outer Border & Dark Glass Box
-        guiGraphics.fill(poolPanelX, poolPanelY, poolPanelX + poolPanelW, poolPanelY + poolPanelH, 0xFF2A2448);
-        guiGraphics.fill(poolPanelX + 1, poolPanelY + 1, poolPanelX + poolPanelW - 1, poolPanelY + poolPanelH - 1, 0xEE121224);
-
-        // Header Bar
-        int headerH = 26;
-        guiGraphics.fill(poolPanelX + 1, poolPanelY + 1, poolPanelX + poolPanelW - 1, poolPanelY + headerH, 0xFF1C1635);
-        guiGraphics.fill(poolPanelX + 1, poolPanelY + headerH, poolPanelX + poolPanelW - 1, poolPanelY + headerH + 1, 0xFF3D2C5E);
-
-        // Header Title
-        guiGraphics.drawString(this.font, "✦ BANNER ITEMS // รายการไอเทม", poolPanelX + 8, poolPanelY + 9, 0xFFFFD166, true);
-        String countBadge = current.items().size() + " Items";
-        int badgeW = this.font.width(countBadge) + 8;
-        int badgeX = poolPanelX + poolPanelW - badgeW - 8;
-        guiGraphics.fill(badgeX, poolPanelY + 6, badgeX + badgeW, poolPanelY + 20, 0xCC2A1C40);
-        guiGraphics.drawString(this.font, countBadge, badgeX + 4, poolPanelY + 9, 0xFFC77DFF, true);
-
-        // Filter Pills Row
-        int filterY = poolPanelY + headerH + 6;
-        int filterH = 16;
-        renderFilterPill(guiGraphics, poolPanelX + 8, filterY, 40, filterH, "All", poolFilter == 0, mouseX, mouseY);
-        renderFilterPill(guiGraphics, poolPanelX + 52, filterY, 36, filterH, "5★", poolFilter == 5, mouseX, mouseY);
-        renderFilterPill(guiGraphics, poolPanelX + 92, filterY, 36, filterH, "4★", poolFilter == 4, mouseX, mouseY);
-        renderFilterPill(guiGraphics, poolPanelX + 132, filterY, 36, filterH, "3★", poolFilter == 3, mouseX, mouseY);
-
-        // Helper instruction text
-        String hintText = "§8• §7ชี้เมาส์เพื่อดูข้อมูลไอเทม";
-        guiGraphics.drawString(this.font, hintText, poolPanelX + poolPanelW - this.font.width(hintText) - 8, filterY + 4, 0xFFA0A0C0, true);
-
-        // Content Area
-        int contentX = poolPanelX + 8;
-        int contentY = filterY + filterH + 6;
-        int contentW = poolPanelW - 16;
-        int contentH = poolPanelH - (contentY - poolPanelY) - 6;
-
-        // Collect and filter items
-        List<SyncBannerDataPayload.BannerItemData> allItems = current.items();
-        List<SyncBannerDataPayload.BannerItemData> displayList = new ArrayList<>();
-        for (SyncBannerDataPayload.BannerItemData item : allItems) {
-            if (poolFilter == 0 || poolFilter == item.stars()) {
-                displayList.add(item);
-            }
-        }
-
-        // Sort: 5-star first, then 4-star, then 3-star. Within same star: rateUp first!
-        displayList.sort((a, b) -> {
-            if (a.stars() != b.stars()) return Integer.compare(b.stars(), a.stars());
-            if (a.isRateUp() != b.isRateUp()) return b.isRateUp() ? 1 : -1;
-            return Integer.compare(b.weight(), a.weight());
-        });
-
-        if (displayList.isEmpty()) {
-            String empty = allItems.isEmpty() ? "No items configured in this banner." : "No items match filter.";
-            guiGraphics.drawString(this.font, empty, contentX + (contentW - this.font.width(empty)) / 2, contentY + contentH / 2 - 4, 0xFF888888, true);
-            return;
-        }
-
-        int cardGap = 4;
-        int cardW = (contentW - cardGap - 6) / 2;
-        int cardH = 28;
-        int rowH = cardH + 4;
-        int totalRows = (displayList.size() + 1) / 2;
-        int visibleRows = Math.max(1, contentH / rowH);
-        int maxScroll = Math.max(0, totalRows - visibleRows);
-        poolScrollOffset = Math.max(0, Math.min(poolScrollOffset, maxScroll));
-
-        boolean canInteract = (activeDetailsModal == null && activeHistoryModal == null && activeMailboxModal == null
-                && activeItemAddEditModal == null && activeItemPoolModal == null && activeBannerSettingsModal == null);
-
-        for (int r = 0; r < visibleRows && (r + poolScrollOffset) < totalRows; r++) {
-            int rowIdx = r + poolScrollOffset;
-            int cardY = contentY + r * rowH;
-
-            for (int col = 0; col < 2; col++) {
-                int itemIdx = rowIdx * 2 + col;
-                if (itemIdx >= displayList.size()) break;
-
-                SyncBannerDataPayload.BannerItemData item = displayList.get(itemIdx);
-                int cardX = contentX + col * (cardW + cardGap);
-
-                boolean hovered = canInteract && mouseX >= cardX && mouseX <= cardX + cardW && mouseY >= cardY && mouseY <= cardY + cardH;
-
-                ItemStack stack = getCachedStack(item);
-
-                // Colors based on rarity
-                int borderColor;
-                int bgBase;
-                int textColor;
-                if (item.stars() >= 5) {
-                    borderColor = 0xFFFFB703; // Gold
-                    bgBase = 0xCC2A1B07;
-                    textColor = 0xFFFFD166;
-                } else if (item.stars() == 4) {
-                    borderColor = 0xFFC77DFF; // Purple
-                    bgBase = 0xCC200F2E;
-                    textColor = 0xFFE0AAFF;
-                } else {
-                    borderColor = 0xFF4CC9F0; // Cyan
-                    bgBase = 0xCC0D1C2A;
-                    textColor = 0xFFE0FBFC;
-                }
-
-                // Render Card Box
-                int bg = hovered ? 0xEE30264E : bgBase;
-                int outline = hovered ? 0xFFFFFFFF : borderColor;
-                guiGraphics.fill(cardX, cardY, cardX + cardW, cardY + cardH, outline);
-                guiGraphics.fill(cardX + 1, cardY + 1, cardX + cardW - 1, cardY + cardH - 1, bg);
-
-                // Item Slot Frame
-                int slotX = cardX + 2;
-                int slotY = cardY + 2;
-                int slotSize = 24;
-                guiGraphics.fill(slotX, slotY, slotX + slotSize, slotY + slotSize, borderColor);
-                guiGraphics.fill(slotX + 1, slotY + 1, slotX + slotSize - 1, slotY + slotSize - 1, 0xCC080812);
-
-                // Item Icon & Count
-                guiGraphics.renderItem(stack, slotX + 4, slotY + 4);
-                guiGraphics.renderItemDecorations(this.font, stack, slotX + 4, slotY + 4);
-
-                // Item Display Name
-                String name = (item.customName() != null && !item.customName().isEmpty())
-                        ? item.customName()
-                        : stack.getHoverName().getString();
-                int maxNameW = cardW - 34;
-                if (item.isRateUp()) maxNameW -= 20;
-                if (this.font.width(name) > maxNameW) {
-                    while (name.length() > 3 && this.font.width(name + "..") > maxNameW) {
-                        name = name.substring(0, name.length() - 1);
-                    }
-                    name += "..";
-                }
-                guiGraphics.drawString(this.font, name, cardX + 29, cardY + 4, textColor, true);
-
-                // Stars rating & subtext
-                String starStr = item.stars() + "★";
-                guiGraphics.drawString(this.font, starStr, cardX + 29, cardY + 15, borderColor, true);
-
-                // Rate-Up Badge
-                if (item.isRateUp()) {
-                    int upW = 18;
-                    int upH = 9;
-                    int upX = cardX + cardW - upW - 3;
-                    int upY = cardY + 3;
-                    guiGraphics.fill(upX, upY, upX + upW, upY + upH, 0xFFFFB703);
-                    guiGraphics.drawString(this.font, "UP", upX + 3, upY + 1, 0xFF000000, false);
-                }
-
-                // If hovered, capture for tooltip
-                if (hovered) {
-                    hoveredPoolStack = stack;
-                }
-            }
-        }
-
-        // Sleek Scrollbar
-        if (totalRows > visibleRows) {
-            int scrollbarX = poolPanelX + poolPanelW - 5;
-            int scrollbarY = contentY;
-            int scrollbarH = contentH;
-            guiGraphics.fill(scrollbarX, scrollbarY, scrollbarX + 2, scrollbarY + scrollbarH, 0x44000000);
-            int thumbH = Math.max(12, (visibleRows * scrollbarH) / totalRows);
-            int thumbY = scrollbarY + (poolScrollOffset * (scrollbarH - thumbH)) / maxScroll;
-            guiGraphics.fill(scrollbarX, thumbY, scrollbarX + 2, thumbY + thumbH, 0xFF8E7DBE);
-        }
-    }
-
-    private void renderFilterPill(GuiGraphics guiGraphics, int x, int y, int w, int h, String label, boolean selected, int mouseX, int mouseY) {
-        boolean hovered = mouseX >= x && mouseX <= x + w && mouseY >= y && mouseY <= y + h;
-        int bg = selected ? 0xFF4A3572 : (hovered ? 0xFF28243C : 0xFF181528);
-        int border = selected ? 0xFFFFD166 : (hovered ? 0xFFAAAAAA : 0xFF352B4E);
-        int text = selected ? 0xFFFFD166 : (hovered ? 0xFFFFFFFF : 0xFFB8B8D4);
-        guiGraphics.fill(x, y, x + w, y + h, border);
-        guiGraphics.fill(x + 1, y + 1, x + w - 1, y + h - 1, bg);
-        int textW = this.font.width(label);
-        guiGraphics.drawString(this.font, label, x + (w - textW) / 2, y + (h - 8) / 2, text, true);
-    }
-
-    private ItemStack getCachedStack(SyncBannerDataPayload.BannerItemData item) {
+    public ItemStack getCachedStack(SyncBannerDataPayload.BannerItemData item) {
         String key = item.itemId() + "#" + item.count() + "#" + (item.customName() != null ? item.customName() : "") + "#" + (item.snbt() != null ? item.snbt() : "");
         return itemStackCache.computeIfAbsent(key, k -> {
             ItemStack stack = ItemStack.EMPTY;
