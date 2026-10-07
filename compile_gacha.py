@@ -4,22 +4,26 @@ import glob
 import zipfile
 import shutil
 
+MOD_VERSION = "1.0.1"
 project_root = os.path.dirname(os.path.abspath(__file__))
 build_dir = os.path.join(project_root, "build")
 libs_out_dir = os.path.join(build_dir, "libs")
 out_classes = os.path.join(build_dir, "classes")
-out_jar = os.path.join(libs_out_dir, "LingGachaAddon-1.0.0+1.21.1-neoforge.jar")
-root_jar = os.path.join(project_root, "LingGachaAddon-1.0.0+1.21.1-neoforge.jar")
+out_jar = os.path.join(libs_out_dir, f"LingGachaAddon-{MOD_VERSION}+1.21.1-neoforge.jar")
+root_jar = os.path.join(project_root, f"LingGachaAddon-{MOD_VERSION}+1.21.1-neoforge.jar")
 
 if os.path.exists(out_classes):
     shutil.rmtree(out_classes)
 os.makedirs(out_classes, exist_ok=True)
 os.makedirs(libs_out_dir, exist_ok=True)
 
-if os.path.exists(out_jar):
-    os.remove(out_jar)
-if os.path.exists(root_jar):
-    os.remove(root_jar)
+# Clean up any existing JAR files in build/libs and project root
+for old_jar in glob.glob(os.path.join(libs_out_dir, "LingGachaAddon*.jar")):
+    try: os.remove(old_jar)
+    except Exception: pass
+for old_jar in glob.glob(os.path.join(project_root, "LingGachaAddon*.jar")):
+    try: os.remove(old_jar)
+    except Exception: pass
 
 # 1. Collect CP with valid zipfile check and Java 21 class version constraint
 def is_valid_jar(p):
@@ -233,7 +237,12 @@ print(f"Release JAR: {root_jar}")
 cf_mods_dir = os.path.join(user_home, "curseforge", "minecraft", "Instances", "Ars Sky Island", "mods")
 if os.path.exists(cf_mods_dir):
     try:
-        deployed_jar = os.path.join(cf_mods_dir, "LingGachaAddon-1.0.0+1.21.1-neoforge.jar")
+        # Clean any older LingGachaAddon versions in CurseForge to avoid duplicate mod crash
+        for old_cf_jar in glob.glob(os.path.join(cf_mods_dir, "LingGachaAddon*.jar")):
+            try: os.remove(old_cf_jar)
+            except Exception: pass
+
+        deployed_jar = os.path.join(cf_mods_dir, f"LingGachaAddon-{MOD_VERSION}+1.21.1-neoforge.jar")
         shutil.copyfile(out_jar, deployed_jar)
         print(f"Auto-deployed to CurseForge: {deployed_jar}")
     except Exception as e:

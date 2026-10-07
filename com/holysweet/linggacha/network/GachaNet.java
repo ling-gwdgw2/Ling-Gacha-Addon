@@ -15,7 +15,7 @@ import java.util.List;
 public class GachaNet {
 
     public static void register(RegisterPayloadHandlersEvent event) {
-        PayloadRegistrar registrar = event.registrar("ling_gacha").versioned("1.0.0");
+        PayloadRegistrar registrar = event.registrar("ling_gacha").versioned("1.0.1");
 
         // 1. Request Open Gacha (Client -> Server)
         registrar.playToServer(

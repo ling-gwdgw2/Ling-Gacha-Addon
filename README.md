@@ -256,3 +256,21 @@ The mod connects directly to `ling_q_shop`'s balance manager through `CoinsServi
 - **Player Data**: `config/ling_gacha/playerdata/<Player_UUID>.json`
   - Secure server-side storage for player pity counts, pull history, Afterglow Corals, and Mailbox items.
 - **Reload Command**: `/convene reload` or `/gacha reload` (Admin only).
+
+---
+
+## Changelog
+
+### Version 1.0.1
+- **Clean Stage Presentation**: Removed the on-stage banner item pool showcase panel to keep splash art unobstructed.
+- **Dedicated Item Pool & Details Modal**: Upgraded `GachaDetailsModal` into a tabbed UI featuring:
+  - Tab 1: **Item Pool** with rarity filter pills (`All`, `5★`, `4★`, `3★`), 2-column cards, rate-up tags, mouse wheel scrolling, and full native Minecraft hover tooltips.
+  - Tab 2: **Rates & Rules** explaining 5★/4★/3★ drop rates, soft/hard pity, and 50/50 guarantees.
+- **AAA Celestial Meteor Cutscene & VFX**:
+  - Cosmic starry nebula backdrop with warp speed streaks and multi-layer plasma tail.
+  - Expanding shockwaves and radiant celestial impact burst.
+  - 16 rotating sunburst light rays behind 5★ cards on reveal.
+  - Multi-layered audio chords featuring `TOTEM_USE`, `UI_TOAST_CHALLENGE_COMPLETE`, and `AMETHYST_BLOCK_CHIME`.
+  - Breathing aurora halo frames and floating golden sparkles on 5★ cards in the 10-card results showcase grid.
+- **Language Harmonization**: Standardized all in-game GUI text to clean English.
+
