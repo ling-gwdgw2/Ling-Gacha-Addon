@@ -26,9 +26,9 @@ import java.util.Random;
 public class GachaRevealScreen extends Screen {
 
     public enum Phase {
-        METEOR_CUTSCENE,  // Phase 1: High-energy falling meteor / resonance cutscene
-        SEQUENTIAL_CARD,  // Phase 2: Reveals cards one-by-one with 3D model and fanfare
-        SUMMARY_GRID      // Phase 3: The iconic 10-Card showcase grid
+        METEOR_CUTSCENE,  // Phase 1: High-energy falling meteor / celestial resonance cutscene
+        SEQUENTIAL_CARD,  // Phase 2: Reveals cards one-by-one with 3D model, sunburst rays, and fanfare
+        SUMMARY_GRID      // Phase 3: The iconic 10-Card showcase grid with breathing aura & tooltips
     }
 
     private final ConveneResultPayload result;
@@ -39,6 +39,7 @@ public class GachaRevealScreen extends Screen {
     private int currentRevealIndex = 0;
     private int cardRevealTick = 0;
     private boolean cutsceneSoundPlayed = false;
+    private boolean impactSoundPlayed = false;
 
     // Controls
     private Button skipBtn;
@@ -60,15 +61,15 @@ public class GachaRevealScreen extends Screen {
         int btnY = this.height - 34;
 
         int pullCount = result.prizes().size();
-        String againText = pullCount == 10 ? "Convene Again (10x)" : "Convene Again (1x)";
+        String againText = pullCount == 10 ? "✦ Convene Again (10x)" : "✦ Convene Again (1x)";
 
         this.pullAgainBtn = Button.builder(Component.literal(againText), b -> {
             PacketDistributor.sendToServer(new PullConvenePayload(result.bannerId(), pullCount));
             returnToGachaScreen();
-        }).bounds(this.width / 2 - 135, btnY, 130, 22).build();
+        }).bounds(this.width / 2 - 140, btnY, 135, 22).build();
 
         this.closeBtn = Button.builder(Component.literal("Confirm"), b -> returnToGachaScreen())
-                .bounds(this.width / 2 + 5, btnY, 130, 22).build();
+                .bounds(this.width / 2 + 5, btnY, 135, 22).build();
 
         this.skipBtn = Button.builder(Component.literal("Skip >>"), b -> skipToSummary())
                 .bounds(this.width - 76, 10, 64, 20).build();
@@ -123,6 +124,12 @@ public class GachaRevealScreen extends Screen {
             }
 
             int cutsceneDuration = getCutsceneDurationTicks();
+
+            // Trigger impact explosion sound right before transition
+            if (phaseTicks >= cutsceneDuration - 8 && !impactSoundPlayed) {
+                playImpactSound();
+            }
+
             if (phaseTicks >= cutsceneDuration) {
                 // Auto-advance to sequential card mode
                 this.currentPhase = Phase.SEQUENTIAL_CARD;
@@ -143,7 +150,7 @@ public class GachaRevealScreen extends Screen {
         if (customAnim != null) {
             return Math.max(25, (customAnim.getTotalDurationMs() / 50));
         }
-        return 50; // 2.5 seconds procedural meteor
+        return 52; // 2.6 seconds procedural meteor
     }
 
     @Override
@@ -154,7 +161,6 @@ public class GachaRevealScreen extends Screen {
             }
 
             if (currentPhase == Phase.METEOR_CUTSCENE) {
-                // Clicking screen during cutscene advances to sequential reveal
                 this.currentPhase = Phase.SEQUENTIAL_CARD;
                 this.phaseTicks = 0;
                 this.currentRevealIndex = 0;
@@ -230,27 +236,42 @@ public class GachaRevealScreen extends Screen {
     }
 
     // =========================================================================
-    // PHASE 1: METEOR CUTSCENE
+    // PHASE 1: METEOR CUTSCENE (PROCEDURAL AAA CELESTIAL METEOR)
     // =========================================================================
 
     private void renderMeteorCutscene(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
-        // Deep Space Canvas
-        guiGraphics.fill(0, 0, this.width, this.height, 0xFF05050D);
-        guiGraphics.fillGradient(0, 0, this.width, this.height, 0xFF090618, 0xFF03030A);
-
-        // Twinkling procedural starfield
-        Random rand = new Random(888L);
-        for (int i = 0; i < 48; i++) {
-            int sx = rand.nextInt(this.width);
-            int sy = rand.nextInt(this.height);
-            int starAlpha = 100 + (int) (Math.sin((ticksElapsed * 0.12) + i) * 80);
-            int starColor = (Math.max(30, Math.min(255, starAlpha)) << 24) | 0x00E0E6FF;
-            guiGraphics.fill(sx, sy, sx + 2, sy + 2, starColor);
-        }
+        // 1. Deep Cosmic Nebula Canvas
+        guiGraphics.fill(0, 0, this.width, this.height, 0xFF050510);
+        guiGraphics.fillGradient(0, 0, this.width, this.height, 0xFF0B0720, 0xFF03030A);
 
         int highestStars = result.highestStars();
         int coreColor = highestStars >= 5 ? 0xFFFFD700 : (highestStars == 4 ? 0xFFC77DFF : 0xFF4CC9F0);
         int auraColor = highestStars >= 5 ? 0xFFFF9E00 : (highestStars == 4 ? 0xFF7209B7 : 0xFF0077B6);
+
+        // Dynamic Nebula Dust Glows
+        guiGraphics.fillGradient(0, 0, this.width, this.height / 2,
+                (highestStars >= 5 ? 0x223D2005 : (highestStars == 4 ? 0x22260B3D : 0x2205243D)), 0x00000000);
+
+        // 2. Twinkling Starfield with Sinusoidal Pulses
+        Random rand = new Random(888L);
+        for (int i = 0; i < 54; i++) {
+            int sx = rand.nextInt(this.width);
+            int sy = rand.nextInt(this.height);
+            int starAlpha = 110 + (int) (Math.sin((ticksElapsed * 0.14) + i * 1.7) * 90);
+            int starColor = (Math.max(30, Math.min(255, starAlpha)) << 24) | 0x00E4EBFF;
+            guiGraphics.fill(sx, sy, sx + 2, sy + 2, starColor);
+        }
+
+        // 3. Hyperspace Speed Streaks (Warp speed across deep cosmos)
+        for (int i = 0; i < 14; i++) {
+            float streakSpeed = 26.0F + (i * 3.5F);
+            float streakX = ((ticksElapsed * streakSpeed + i * 85) % (this.width + 300)) - 100;
+            float streakY = ((ticksElapsed * (streakSpeed * 0.65F) + i * 65) % (this.height + 200)) - 50;
+            int len = 35 + (i * 7);
+            int alpha = 40 + (i * 6);
+            int col = (alpha << 24) | (coreColor & 0x00FFFFFF);
+            guiGraphics.fill((int) streakX, (int) streakY, (int) (streakX + len), (int) (streakY + 1), col);
+        }
 
         // Check if custom animated texture exists
         boolean customPlayed = com.holysweet.linggacha.client.animation.AnimationManager.renderPullAnimation(
@@ -258,83 +279,118 @@ public class GachaRevealScreen extends Screen {
         );
 
         if (!customPlayed) {
-            float progress = Math.min(1.0F, phaseTicks / 46.0F);
+            float progress = Math.min(1.0F, phaseTicks / 48.0F);
 
-            // Procedural Radiant Meteor Comet
-            float startX = -60.0F;
+            // Hypersonic Meteor Trajectory with dramatic easing
+            float startX = -80.0F;
             float startY = -60.0F;
-            float targetX = this.width * 0.68F;
-            float targetY = this.height * 0.62F;
+            float targetX = this.width * 0.65F;
+            float targetY = this.height * 0.58F;
 
-            // Smooth accelerated trajectory
-            float ease = (float) Math.sin(progress * Math.PI * 0.5);
+            // Ease-in acceleration curve
+            float ease = progress * progress * (2.2F - 1.2F * progress);
             float meteorX = startX + (targetX - startX) * ease;
             float meteorY = startY + (targetY - startY) * ease;
 
-            // 1. Long comet tail
-            int trailSteps = 24;
             float dirX = targetX - startX;
             float dirY = targetY - startY;
             float dirLen = (float) Math.sqrt(dirX * dirX + dirY * dirY);
             float ndx = dirX / (dirLen > 0 ? dirLen : 1.0F);
             float ndy = dirY / (dirLen > 0 ? dirLen : 1.0F);
 
+            // 4. Volumetric Multi-Strand Tail
+            int trailSteps = 30;
             for (int s = trailSteps; s >= 1; s--) {
-                float trailDist = s * 8.0F;
+                float trailDist = s * 9.5F;
                 float tx = meteorX - ndx * trailDist;
                 float ty = meteorY - ndy * trailDist;
-                int alpha = (int) ((1.0F - (float) s / trailSteps) * 170);
-                int rad = (int) (14 * (1.0F - (float) s / trailSteps) + 2);
-                int color = (alpha << 24) | (auraColor & 0x00FFFFFF);
-                guiGraphics.fill((int) tx - rad, (int) ty - rad, (int) tx + rad, (int) ty + rad, color);
+                float frac = 1.0F - ((float) s / trailSteps);
+
+                // Outer aura strand
+                int auraAlpha = (int) (frac * 160);
+                int radAura = (int) (18 * frac + 2);
+                int auraC = (auraAlpha << 24) | (auraColor & 0x00FFFFFF);
+                guiGraphics.fill((int) tx - radAura, (int) ty - radAura, (int) tx + radAura, (int) ty + radAura, auraC);
+
+                // Inner blazing core strand
+                int coreAlpha = (int) (frac * 240);
+                int radCore = (int) (9 * frac + 1);
+                int coreC = (coreAlpha << 24) | (coreColor & 0x00FFFFFF);
+                guiGraphics.fill((int) tx - radCore, (int) ty - radCore, (int) tx + radCore, (int) ty + radCore, coreC);
+
+                // Sparkling Embers sprayed in the wake
+                if (s % 2 == 0) {
+                    float spray = (float) Math.sin(s * 1.8F + phaseTicks * 0.6F) * (14.0F * frac);
+                    float ex = tx - ndy * spray;
+                    float ey = ty + ndx * spray;
+                    int emberAlpha = (int) (frac * 220);
+                    int emberC = (emberAlpha << 24) | (coreColor & 0x00FFFFFF);
+                    guiGraphics.fill((int) ex - 1, (int) ey - 1, (int) ex + 2, (int) ey + 2, emberC);
+                }
             }
 
-            // 2. Glowing Head & Core
-            int headGlowRad = 28;
+            // 5. Blazing Radiant Meteor Head
+            int headGlowRad = 34;
             guiGraphics.fill((int) meteorX - headGlowRad, (int) meteorY - headGlowRad,
-                    (int) meteorX + headGlowRad, (int) meteorY + headGlowRad, (0x66 << 24) | (auraColor & 0x00FFFFFF));
-            int headInnerRad = 16;
-            guiGraphics.fill((int) meteorX - headInnerRad, (int) meteorY - headInnerRad,
-                    (int) meteorX + headInnerRad, (int) meteorY + headInnerRad, (0xBB << 24) | (coreColor & 0x00FFFFFF));
-            int headCoreRad = 8;
+                    (int) meteorX + headGlowRad, (int) meteorY + headGlowRad, (0x77 << 24) | (auraColor & 0x00FFFFFF));
+
+            int headMidRad = 20;
+            guiGraphics.fill((int) meteorX - headMidRad, (int) meteorY - headMidRad,
+                    (int) meteorX + headMidRad, (int) meteorY + headMidRad, (0xDD << 24) | (coreColor & 0x00FFFFFF));
+
+            int headCoreRad = 9;
             guiGraphics.fill((int) meteorX - headCoreRad, (int) meteorY - headCoreRad,
                     (int) meteorX + headCoreRad, (int) meteorY + headCoreRad, 0xFFFFFFFF);
 
-            // 3. Shockwave Rings near impact
-            if (progress > 0.55F) {
-                float impactP = (progress - 0.55F) / 0.45F;
-                int ringRad = (int) (impactP * 95);
-                int ringAlpha = (int) ((1.0F - impactP) * 190);
+            // Diamond Star Glint on Core
+            drawStarFlare(guiGraphics, (int) meteorX, (int) meteorY, 32, 0xFFFFFFFF);
+            drawStarFlare(guiGraphics, (int) meteorX, (int) meteorY, 18, coreColor);
+
+            // 6. Expanding Resonance Shockwaves
+            if (progress > 0.52F) {
+                float impactP = (progress - 0.52F) / 0.48F;
+                int ringRad = (int) (impactP * 110);
+                int ringAlpha = (int) ((1.0F - impactP) * 220);
                 int ringCol = (ringAlpha << 24) | (coreColor & 0x00FFFFFF);
-                drawHollowCircle(guiGraphics, (int) targetX, (int) targetY, ringRad, ringCol);
-                drawHollowCircle(guiGraphics, (int) targetX, (int) targetY, ringRad / 2, ringCol);
+                drawShockwaveRings(guiGraphics, (int) targetX, (int) targetY, ringRad, ringCol, 2);
+                drawShockwaveRings(guiGraphics, (int) targetX, (int) targetY, (int) (ringRad * 0.6F), ringCol, 1);
             }
 
-            // 4. Impact Flash Burst
-            if (progress >= 0.88F) {
-                float flashP = (progress - 0.88F) / 0.12F;
-                int flashAlpha = (int) ((1.0F - flashP) * 210);
+            // 7. Celestial Impact Burst (Blinding Flash + Radial Rays)
+            if (progress >= 0.84F) {
+                float flashP = (progress - 0.84F) / 0.16F;
+                int flashAlpha = (int) ((1.0F - flashP) * 230);
                 guiGraphics.fill(0, 0, this.width, this.height, (flashAlpha << 24) | (coreColor & 0x00FFFFFF));
+
+                // Radial impact light beams
+                drawSunburstRays(guiGraphics, (int) targetX, (int) targetY, 16, 220.0F * flashP, ticksElapsed * 2.0F, coreColor);
             }
         }
 
-        // Subtitle & Skip Prompts
+        // Subtitle & Status Prompts
         String resonanceText = highestStars >= 5 ? "★ 5-STAR CELESTIAL RESONANCE DETECTED ★" :
-                (highestStars == 4 ? "★ 4-STAR RESONANCE DETECTED ★" : "CONVENING RESONANCE FREQUENCIES...");
-        guiGraphics.drawString(this.font, resonanceText,
-                this.width / 2 - this.font.width(resonanceText) / 2, this.height - 52, coreColor, true);
+                (highestStars == 4 ? "★ 4-STAR FEATURED RESONANCE DETECTED ★" : "CONVENING RESONANCE FREQUENCIES...");
+
+        int badgeW = this.font.width(resonanceText) + 24;
+        int badgeX = this.width / 2 - badgeW / 2;
+        int badgeY = this.height - 56;
+
+        guiGraphics.fill(badgeX, badgeY, badgeX + badgeW, badgeY + 18, 0xCC0D0A1C);
+        guiGraphics.fill(badgeX, badgeY, badgeX + badgeW, badgeY + 1, coreColor);
+        guiGraphics.drawString(this.font, resonanceText, this.width / 2 - this.font.width(resonanceText) / 2, badgeY + 5, coreColor, true);
 
         String clickPrompt = "Click screen to reveal cards  •  [Skip >>] for all";
         guiGraphics.drawString(this.font, clickPrompt,
-                this.width / 2 - this.font.width(clickPrompt) / 2, this.height - 36, 0xFF8888AA, true);
+                this.width / 2 - this.font.width(clickPrompt) / 2, this.height - 32, 0xFFA0A0C0, true);
     }
 
     // =========================================================================
-    // PHASE 2: SEQUENTIAL CARD REVEAL
+    // PHASE 2: SEQUENTIAL CARD REVEAL (3D SUNBURST & FANFARE)
     // =========================================================================
 
     private void renderSequentialCard(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
-        guiGraphics.fill(0, 0, this.width, this.height, 0xFF06060F);
+        guiGraphics.fill(0, 0, this.width, this.height, 0xFF060610);
+        guiGraphics.fillGradient(0, 0, this.width, this.height, 0xFF0D0A1C, 0xFF04040A);
 
         if (result.prizes().isEmpty()) {
             skipToSummary();
@@ -347,46 +403,75 @@ public class GachaRevealScreen extends Screen {
         int bgColor = getRarityBg(stars);
 
         int cx = this.width / 2;
-        int cy = this.height / 2 - 12;
+        int cy = this.height / 2 - 10;
 
         float animScale = Math.min(1.0F, cardRevealTick / 5.0F);
 
-        // Flash on first 4 ticks of 5-star
+        // Flash burst on first 4 ticks of 5-star or 4-star
         if (stars >= 5 && cardRevealTick < 5) {
-            int flashAlpha = (int) ((1.0F - cardRevealTick / 5.0F) * 160);
+            int flashAlpha = (int) ((1.0F - cardRevealTick / 5.0F) * 190);
             guiGraphics.fill(0, 0, this.width, this.height, (flashAlpha << 24) | 0x00FFD700);
+        } else if (stars == 4 && cardRevealTick < 4) {
+            int flashAlpha = (int) ((1.0F - cardRevealTick / 4.0F) * 140);
+            guiGraphics.fill(0, 0, this.width, this.height, (flashAlpha << 24) | 0x00C77DFF);
+        }
+
+        // 1. Rotating Volumetric Sunburst Rays Behind Card
+        if (stars >= 5) {
+            drawSunburstRays(guiGraphics, cx, cy, 16, 190.0F, ticksElapsed * 1.5F, 0xFFFFD700);
+        } else if (stars == 4) {
+            drawSunburstRays(guiGraphics, cx, cy, 12, 160.0F, ticksElapsed * 1.0F, 0xFFC77DFF);
         }
 
         int cardW = 210;
-        int cardH = 270;
+        int cardH = 275;
         int cardX = cx - cardW / 2;
         int cardY = cy - cardH / 2;
 
-        // Card Glow Halo
-        int halo = stars >= 5 ? 12 : 6;
-        guiGraphics.fill(cardX - halo, cardY - halo, cardX + cardW + halo, cardY + cardH + halo,
-                (0x33 << 24) | (borderColor & 0x00FFFFFF));
+        // 2. Animated Pulsing Aura Halo
+        float pulse = (float) Math.sin(ticksElapsed * 0.16F);
+        int haloSize = stars >= 5 ? (int) (14 + 6 * pulse) : (stars == 4 ? 8 : 4);
+        int haloAlpha = stars >= 5 ? (int) (60 + 35 * pulse) : 40;
+        guiGraphics.fill(cardX - haloSize, cardY - haloSize, cardX + cardW + haloSize, cardY + cardH + haloSize,
+                (haloAlpha << 24) | (borderColor & 0x00FFFFFF));
 
-        // Card Border & Background
+        // 3. Card Outer Border & Inner Glass Box
         guiGraphics.fill(cardX, cardY, cardX + cardW, cardY + cardH, borderColor);
         guiGraphics.fill(cardX + 2, cardY + 2, cardX + cardW - 2, cardY + cardH - 2, bgColor);
 
-        // High Resonance Header Ribbon
-        if (stars >= 5) {
-            String bannerTag = "★ 5-STAR LEGENDARY ★";
-            guiGraphics.fill(cardX, cardY, cardX + cardW, cardY + 18, 0xFFD4AF37);
-            guiGraphics.drawString(this.font, bannerTag, cx - this.font.width(bannerTag) / 2, cardY + 5, 0xFF140E00, false);
-        } else if (stars == 4) {
-            String bannerTag = "★ 4-STAR FEATURED ★";
-            guiGraphics.fill(cardX, cardY, cardX + cardW, cardY + 18, 0xFF8A2BE2);
-            guiGraphics.drawString(this.font, bannerTag, cx - this.font.width(bannerTag) / 2, cardY + 5, 0xFFFFFFFF, false);
+        // Ambient Floating Particles inside Card
+        for (int p = 0; p < 12; p++) {
+            float py = (cardY + cardH - 10) - ((ticksElapsed * 1.8F + p * 25.0F) % (cardH - 30));
+            float px = cardX + 16 + ((p * 29) % (cardW - 32));
+            int pAlpha = (int) (Math.sin((py - cardY) / (float) cardH * Math.PI) * 180);
+            if (pAlpha > 20) {
+                guiGraphics.fill((int) px, (int) py, (int) px + 2, (int) py + 2,
+                        (pAlpha << 24) | (borderColor & 0x00FFFFFF));
+            }
         }
 
-        // 3D Item Showcase
+        // 4. Ribbon Banner Header
+        if (stars >= 5) {
+            String bannerTag = "✦ 5★ LEGENDARY // CELESTIAL RESONANCE ✦";
+            guiGraphics.fill(cardX, cardY, cardX + cardW, cardY + 20, 0xFFD4AF37);
+            guiGraphics.drawString(this.font, bannerTag, cx - this.font.width(bannerTag) / 2, cardY + 6, 0xFF160E00, false);
+            // Corner Ornaments
+            guiGraphics.drawString(this.font, "◆", cardX + 4, cardY + 23, 0xFFFFD700, true);
+            guiGraphics.drawString(this.font, "◆", cardX + cardW - 10, cardY + 23, 0xFFFFD700, true);
+        } else if (stars == 4) {
+            String bannerTag = "✦ 4★ FEATURED // RESONANCE ✦";
+            guiGraphics.fill(cardX, cardY, cardX + cardW, cardY + 20, 0xFF8A2BE2);
+            guiGraphics.drawString(this.font, bannerTag, cx - this.font.width(bannerTag) / 2, cardY + 6, 0xFFFFFFFF, false);
+        }
+
+        // 5. 3D Spinning Item Showcase
         ItemStack stack = getItemStack(prize);
         float time = (System.currentTimeMillis() % 3600000L) / 1000.0F;
-        float rot = (time * 40.0F) % 360.0F;
-        float bob = (float) Math.sin(time * 2.5F) * 4.0F;
+        float rot = (time * 42.0F) % 360.0F;
+        float bob = (float) Math.sin(time * 2.8F) * 4.5F;
+
+        // Circular glow dais underneath 3D model
+        drawShockwaveRings(guiGraphics, cx, cy - 20, 36, (0x44 << 24) | (borderColor & 0x00FFFFFF), 2);
 
         PoseStack pose = guiGraphics.pose();
         pose.pushPose();
@@ -408,12 +493,12 @@ public class GachaRevealScreen extends Screen {
         guiGraphics.flush();
         pose.popPose();
 
-        // Stars Row
+        // 6. Stars Rating Row
         String starStr = getStarsSymbols(stars);
         int starY = cardY + cardH - 85;
         guiGraphics.drawString(this.font, starStr, cx - this.font.width(starStr) / 2, starY, borderColor, true);
 
-        // Item Name
+        // 7. Item Display Name
         String name = (prize.name() != null && !prize.name().isEmpty()) ? prize.name() : stack.getHoverName().getString();
         int nameY = starY + 16;
         guiGraphics.drawString(this.font, name, cx - this.font.width(name) / 2, nameY, 0xFFFFFFFF, true);
@@ -429,28 +514,30 @@ public class GachaRevealScreen extends Screen {
         guiGraphics.drawString(this.font, tracker, cx - this.font.width(tracker) / 2, this.height - 44, 0xFFFFD700, true);
 
         String clickNext = "Click anywhere to continue >>";
-        guiGraphics.drawString(this.font, clickNext, cx - this.font.width(clickNext) / 2, this.height - 28, 0xFFAAAAAA, true);
+        guiGraphics.drawString(this.font, clickNext, cx - this.font.width(clickNext) / 2, this.height - 28, 0xFFA0A0C0, true);
     }
 
     // =========================================================================
-    // PHASE 3: RESULTS SHOWCASE GRID
+    // PHASE 3: RESULTS SHOWCASE GRID (10-CARD BREATHING AURA & HOVER TOOLTIPS)
     // =========================================================================
 
     private void renderSummaryGrid(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
         guiGraphics.fill(0, 0, this.width, this.height, 0xFF080814);
+        guiGraphics.fillGradient(0, 0, this.width, this.height, 0xFF0F0B24, 0xFF05050C);
 
         // Header Title
-        String title = "CONVENE RESULTS";
+        String title = "✦ CONVENE RESULTS // สรุปผลการสุ่ม ✦";
         int titleX = this.width / 2 - this.font.width(title) / 2;
-        guiGraphics.drawString(this.font, title, titleX, 14, 0xFFFFD700, true);
-        guiGraphics.fill(titleX - 12, 25, titleX + this.font.width(title) + 12, 26, 0x88FFD700);
+        guiGraphics.drawString(this.font, title, titleX, 13, 0xFFFFD700, true);
+        guiGraphics.fill(titleX - 16, 24, titleX + this.font.width(title) + 16, 25, 0x88FFD700);
 
         // Corals earned pill
         String coralText = "+ " + result.corals() + " Afterglow Corals Total";
-        int coralW = this.font.width(coralText) + 12;
+        int coralW = this.font.width(coralText) + 14;
         int coralX = this.width / 2 - coralW / 2;
-        guiGraphics.fill(coralX, 30, coralX + coralW, 44, 0xCC2A163B);
-        guiGraphics.drawString(this.font, coralText, coralX + 6, 33, 0xFFC77DFF, true);
+        guiGraphics.fill(coralX, 29, coralX + coralW, 43, 0xDD2A163B);
+        guiGraphics.fill(coralX + 1, 30, coralX + coralW - 1, 42, 0xEE1E0F2B);
+        guiGraphics.drawString(this.font, coralText, coralX + 7, 32, 0xFFC77DFF, true);
 
         List<ConveneResultPayload.PrizeData> prizes = result.prizes();
         if (prizes.size() == 1) {
@@ -458,19 +545,28 @@ public class GachaRevealScreen extends Screen {
         } else {
             renderTenSummaryGrid(guiGraphics, prizes, mouseX, mouseY);
         }
+
+        // Bottom hint
+        String hint = "§8• §7ชี้เมาส์ที่การ์ดเพื่อดูข้อมูลและสเตตัสไอเทม (Hover to inspect)";
+        guiGraphics.drawString(this.font, hint, this.width / 2 - this.font.width(hint) / 2, this.height - 48, 0xFFA0A0C0, true);
     }
 
     private void renderSingleSummaryCard(GuiGraphics guiGraphics, ConveneResultPayload.PrizeData prize, int mouseX, int mouseY) {
         int cardW = 160;
-        int cardH = 200;
+        int cardH = 205;
         int cardX = this.width / 2 - cardW / 2;
-        int cardY = this.height / 2 - cardH / 2 - 8;
+        int cardY = this.height / 2 - cardH / 2 - 10;
 
         int borderColor = getRarityColor(prize.stars());
         int bgColor = getRarityBg(prize.stars());
 
-        // Card Glow & Body
-        guiGraphics.fill(cardX - 4, cardY - 4, cardX + cardW + 4, cardY + cardH + 4, (0x33 << 24) | (borderColor & 0x00FFFFFF));
+        // Pulsing Aura Halo
+        float pulse = (float) Math.sin(ticksElapsed * 0.16F);
+        int haloSize = prize.stars() >= 5 ? (int) (10 + 4 * pulse) : (prize.stars() == 4 ? 6 : 3);
+        int haloAlpha = prize.stars() >= 5 ? (int) (70 + 35 * pulse) : 40;
+        guiGraphics.fill(cardX - haloSize, cardY - haloSize, cardX + cardW + haloSize, cardY + cardH + haloSize,
+                (haloAlpha << 24) | (borderColor & 0x00FFFFFF));
+
         guiGraphics.fill(cardX, cardY, cardX + cardW, cardY + cardH, borderColor);
         guiGraphics.fill(cardX + 2, cardY + 2, cardX + cardW - 2, cardY + cardH - 2, bgColor);
 
@@ -485,15 +581,15 @@ public class GachaRevealScreen extends Screen {
 
         // Stars Display
         String stars = getStarsSymbols(prize.stars());
-        guiGraphics.drawString(this.font, stars, cardX + cardW / 2 - this.font.width(stars) / 2, cardY + 115, borderColor, true);
+        guiGraphics.drawString(this.font, stars, cardX + cardW / 2 - this.font.width(stars) / 2, cardY + 118, borderColor, true);
 
         // Name
         String name = (prize.name() != null && !prize.name().isEmpty()) ? prize.name() : stack.getHoverName().getString();
-        guiGraphics.drawString(this.font, name, cardX + cardW / 2 - this.font.width(name) / 2, cardY + 135, 0xFFFFFFFF, true);
+        guiGraphics.drawString(this.font, name, cardX + cardW / 2 - this.font.width(name) / 2, cardY + 138, 0xFFFFFFFF, true);
 
         if (prize.count() > 1) {
             String countStr = "x" + prize.count();
-            guiGraphics.drawString(this.font, countStr, cardX + cardW / 2 - this.font.width(countStr) / 2, cardY + 152, 0xFFFFD700, true);
+            guiGraphics.drawString(this.font, countStr, cardX + cardW / 2 - this.font.width(countStr) / 2, cardY + 155, 0xFFFFD700, true);
         }
 
         // Hover Tooltip Check
@@ -503,15 +599,15 @@ public class GachaRevealScreen extends Screen {
     }
 
     private void renderTenSummaryGrid(GuiGraphics guiGraphics, List<ConveneResultPayload.PrizeData> prizes, int mouseX, int mouseY) {
-        int cardW = 80;
-        int cardH = 110;
+        int cardW = 82;
+        int cardH = 114;
         int gapX = 12;
         int gapY = 12;
 
         int totalW = 5 * cardW + 4 * gapX;
         int totalH = 2 * cardH + gapY;
         int startX = this.width / 2 - totalW / 2;
-        int startY = this.height / 2 - totalH / 2 - 4;
+        int startY = this.height / 2 - totalH / 2 - 8;
 
         for (int i = 0; i < prizes.size() && i < 10; i++) {
             ConveneResultPayload.PrizeData prize = prizes.get(i);
@@ -526,38 +622,63 @@ public class GachaRevealScreen extends Screen {
 
             boolean hovered = (mouseX >= x && mouseX <= x + cardW && mouseY >= y && mouseY <= y + cardH);
 
-            // Glowing Card Background
+            // Glowing Breathing Aura for 5★ and 4★ cards
             if (prize.stars() >= 5) {
-                // Golden pulsing shimmer
-                guiGraphics.fill(x - 3, y - 3, x + cardW + 3, y + cardH + 3, 0x44FFD700);
+                float pulse = (float) Math.sin((ticksElapsed + i * 4) * 0.18F);
+                int auraAlpha = (int) (130 + 70 * pulse);
+                guiGraphics.fill(x - 4, y - 4, x + cardW + 4, y + cardH + 4, (auraAlpha << 24) | 0x00FFD700);
+
+                // Floating sparkle motes above 5★ card
+                int sparkleY = y + cardH - (int) ((ticksElapsed * 1.5F + i * 16) % (cardH + 10));
+                int sparkleX = x + 12 + ((i * 31) % (cardW - 24));
+                guiGraphics.fill(sparkleX, sparkleY, sparkleX + 2, sparkleY + 2, 0xFFFFD700);
+            } else if (prize.stars() == 4) {
+                float pulse = (float) Math.sin((ticksElapsed + i * 4) * 0.16F);
+                int auraAlpha = (int) (90 + 50 * pulse);
+                guiGraphics.fill(x - 2, y - 2, x + cardW + 2, y + cardH + 2, (auraAlpha << 24) | 0x00C77DFF);
             }
+
+            // Hover Frame Highlight
             if (hovered) {
                 guiGraphics.fill(x - 2, y - 2, x + cardW + 2, y + cardH + 2, 0xFFFFFFFF);
             }
 
+            // Main Card Box
             guiGraphics.fill(x, y, x + cardW, y + cardH, borderColor);
-            guiGraphics.fill(x + 1, y + 1, x + cardW - 1, y + cardH - 1, bgColor);
+            guiGraphics.fill(x + 1, y + 1, x + cardW - 1, y + cardH - 1, hovered ? 0xEE30264E : bgColor);
 
-            // Render Item Icon in Center
+            // Corner Diamond Accent for 5★
+            if (prize.stars() >= 5) {
+                guiGraphics.drawString(this.font, "◆", x + 3, y + 2, 0xFFFFD700, false);
+                guiGraphics.drawString(this.font, "◆", x + cardW - 9, y + 2, 0xFFFFD700, false);
+            }
+
+            // Item Slot Frame & Icon
             ItemStack stack = getItemStack(prize);
-            guiGraphics.renderItem(stack, x + cardW / 2 - 8, y + 18);
-            guiGraphics.renderItemDecorations(this.font, stack, x + cardW / 2 - 8, y + 18);
+            int slotX = x + cardW / 2 - 12;
+            int slotY = y + 16;
+            guiGraphics.fill(slotX, slotY, slotX + 24, slotY + 24, borderColor);
+            guiGraphics.fill(slotX + 1, slotY + 1, slotX + 23, slotY + 23, 0xCC0D0B18);
+
+            guiGraphics.renderItem(stack, slotX + 4, slotY + 4);
+            guiGraphics.renderItemDecorations(this.font, stack, slotX + 4, slotY + 4);
 
             // Stars
             String stars = getStarsSymbols(prize.stars());
             guiGraphics.drawString(this.font, stars, x + cardW / 2 - this.font.width(stars) / 2, y + 54, borderColor, true);
 
-            // Truncated Item Name
+            // Item Display Name
             String name = (prize.name() != null && !prize.name().isEmpty()) ? prize.name() : stack.getHoverName().getString();
-            if (this.font.width(name) > cardW - 6) {
-                name = name.substring(0, Math.min(name.length(), 7)) + "..";
+            if (this.font.width(name) > cardW - 8) {
+                name = name.substring(0, Math.min(name.length(), 6)) + "..";
             }
-            guiGraphics.drawString(this.font, name, x + cardW / 2 - this.font.width(name) / 2, y + 72, 0xFFFFFFFF, true);
+            int nameColor = prize.stars() >= 5 ? 0xFFFFD166 : (prize.stars() == 4 ? 0xFFE0AAFF : 0xFFFFFFFF);
+            guiGraphics.drawString(this.font, name, x + cardW / 2 - this.font.width(name) / 2, y + 72, nameColor, true);
 
             // Count badge
             if (prize.count() > 1) {
                 String countStr = "x" + prize.count();
-                guiGraphics.drawString(this.font, countStr, x + cardW - this.font.width(countStr) - 5, y + 92, 0xFFFFD700, true);
+                guiGraphics.drawString(this.font, countStr, x + cardW - this.font.width(countStr) - 5, y + 94, 0xFFFFD700, true);
             }
 
             if (hovered) {
@@ -567,48 +688,111 @@ public class GachaRevealScreen extends Screen {
     }
 
     // =========================================================================
-    // AUDIO & UTILITY HELPERS
+    // AUDIO & CELESTIAL VFX HELPERS
     // =========================================================================
 
     private void playCutsceneSound() {
         if (Minecraft.getInstance().player != null) {
-            Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.FIREWORK_ROCKET_LAUNCH, 1.0F));
+            var sm = Minecraft.getInstance().getSoundManager();
+            sm.play(SimpleSoundInstance.forUI(SoundEvents.FIREWORK_ROCKET_LAUNCH, 0.85F));
             if (result.highestStars() >= 5) {
-                Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.AMETHYST_BLOCK_CHIME, 1.2F));
+                sm.play(SimpleSoundInstance.forUI(SoundEvents.BEACON_ACTIVATE, 1.2F));
+                sm.play(SimpleSoundInstance.forUI(SoundEvents.AMETHYST_BLOCK_RESONATE, 1.0F));
+            } else if (result.highestStars() == 4) {
+                sm.play(SimpleSoundInstance.forUI(SoundEvents.RESPAWN_ANCHOR_CHARGE, 1.3F));
+                sm.play(SimpleSoundInstance.forUI(SoundEvents.AMETHYST_BLOCK_CHIME, 1.0F));
+            } else {
+                sm.play(SimpleSoundInstance.forUI(SoundEvents.AMETHYST_CLUSTER_STEP, 1.0F));
+            }
+        }
+    }
+
+    private void playImpactSound() {
+        if (!impactSoundPlayed && Minecraft.getInstance().player != null) {
+            impactSoundPlayed = true;
+            var sm = Minecraft.getInstance().getSoundManager();
+            sm.play(SimpleSoundInstance.forUI(SoundEvents.FIREWORK_ROCKET_BLAST, 1.0F));
+            if (result.highestStars() >= 5) {
+                sm.play(SimpleSoundInstance.forUI(SoundEvents.TOTEM_USE, 1.2F));
+                sm.play(SimpleSoundInstance.forUI(SoundEvents.UI_TOAST_CHALLENGE_COMPLETE, 0.9F));
+                sm.play(SimpleSoundInstance.forUI(SoundEvents.AMETHYST_BLOCK_CHIME, 1.5F));
+            } else if (result.highestStars() == 4) {
+                sm.play(SimpleSoundInstance.forUI(SoundEvents.PLAYER_LEVELUP, 1.1F));
+                sm.play(SimpleSoundInstance.forUI(SoundEvents.AMETHYST_BLOCK_CHIME, 1.2F));
+            } else {
+                sm.play(SimpleSoundInstance.forUI(SoundEvents.AMETHYST_CLUSTER_STEP, 1.1F));
             }
         }
     }
 
     private void playCardRevealSound(int stars) {
         if (Minecraft.getInstance().player != null) {
+            var sm = Minecraft.getInstance().getSoundManager();
             if (stars >= 5) {
-                Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.UI_TOAST_CHALLENGE_COMPLETE, 1.0F));
+                sm.play(SimpleSoundInstance.forUI(SoundEvents.TOTEM_USE, 1.15F));
+                sm.play(SimpleSoundInstance.forUI(SoundEvents.UI_TOAST_CHALLENGE_COMPLETE, 1.0F));
+                sm.play(SimpleSoundInstance.forUI(SoundEvents.AMETHYST_BLOCK_CHIME, 1.4F));
+                sm.play(SimpleSoundInstance.forUI(SoundEvents.FIREWORK_ROCKET_TWINKLE, 1.2F));
             } else if (stars == 4) {
-                Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.PLAYER_LEVELUP, 1.2F));
+                sm.play(SimpleSoundInstance.forUI(SoundEvents.PLAYER_LEVELUP, 1.15F));
+                sm.play(SimpleSoundInstance.forUI(SoundEvents.AMETHYST_BLOCK_RESONATE, 1.2F));
+                sm.play(SimpleSoundInstance.forUI(SoundEvents.FIREWORK_ROCKET_TWINKLE, 1.0F));
             } else {
-                Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.EXPERIENCE_ORB_PICKUP, 1.0F));
+                sm.play(SimpleSoundInstance.forUI(SoundEvents.EXPERIENCE_ORB_PICKUP, 1.0F));
             }
         }
     }
 
     private void playSummarySound() {
         if (Minecraft.getInstance().player != null) {
+            var sm = Minecraft.getInstance().getSoundManager();
             if (result.highestStars() >= 5) {
-                Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.UI_TOAST_CHALLENGE_COMPLETE, 0.9F));
+                sm.play(SimpleSoundInstance.forUI(SoundEvents.UI_TOAST_CHALLENGE_COMPLETE, 0.9F));
+                sm.play(SimpleSoundInstance.forUI(SoundEvents.BEACON_POWER_SELECT, 1.2F));
             } else if (result.highestStars() == 4) {
-                Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.PLAYER_LEVELUP, 1.0F));
+                sm.play(SimpleSoundInstance.forUI(SoundEvents.PLAYER_LEVELUP, 1.0F));
             } else {
-                Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 1.0F));
+                sm.play(SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 1.0F));
             }
         }
     }
 
-    private void drawHollowCircle(GuiGraphics guiGraphics, int cx, int cy, int radius, int color) {
-        for (int a = 0; a < 360; a += 15) {
+    private void drawSunburstRays(GuiGraphics guiGraphics, int cx, int cy, int numRays, float rayLength, float rotation, int color) {
+        for (int i = 0; i < numRays; i++) {
+            double angle = Math.toRadians(rotation + i * (360.0F / numRays));
+            double cos = Math.cos(angle);
+            double sin = Math.sin(angle);
+            int steps = 18;
+            for (int s = 1; s <= steps; s++) {
+                float dist = (s / (float) steps) * rayLength;
+                int px = (int) (cx + cos * dist);
+                int py = (int) (cy + sin * dist);
+                int alpha = (int) ((1.0F - (s / (float) steps)) * 80);
+                int c = (alpha << 24) | (color & 0x00FFFFFF);
+                int size = Math.max(1, (int) (s * 0.75F));
+                guiGraphics.fill(px - size, py - size, px + size, py + size, c);
+            }
+        }
+    }
+
+    private void drawStarFlare(GuiGraphics guiGraphics, int cx, int cy, int length, int color) {
+        for (int d = -length; d <= length; d++) {
+            float fade = 1.0F - Math.abs(d) / (float) length;
+            int a = (int) (fade * 255);
+            int c = (a << 24) | (color & 0x00FFFFFF);
+            int thick = Math.max(1, (int) (fade * 3));
+            guiGraphics.fill(cx + d, cy - thick, cx + d + 1, cy + thick, c);
+            guiGraphics.fill(cx - thick, cy + d, cx + thick, cy + d + 1, c);
+        }
+    }
+
+    private void drawShockwaveRings(GuiGraphics guiGraphics, int cx, int cy, int radius, int color, int thickness) {
+        int step = Math.max(4, 360 / Math.max(12, radius * 2));
+        for (int a = 0; a < 360; a += step) {
             double rad = Math.toRadians(a);
             int px = cx + (int) (Math.cos(rad) * radius);
             int py = cy + (int) (Math.sin(rad) * radius);
-            guiGraphics.fill(px - 1, py - 1, px + 1, py + 1, color);
+            guiGraphics.fill(px - thickness, py - thickness, px + thickness, py + thickness, color);
         }
     }
 
@@ -619,9 +803,9 @@ public class GachaRevealScreen extends Screen {
     }
 
     private int getRarityBg(int stars) {
-        if (stars >= 5) return 0xFF281E08;
-        if (stars == 4) return 0xFF1C1028;
-        return 0xFF0D1527;
+        if (stars >= 5) return 0xFF2A1C08;
+        if (stars == 4) return 0xFF1E102E;
+        return 0xFF0D1629;
     }
 
     private String getStarsSymbols(int stars) {
